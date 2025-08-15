@@ -1,0 +1,14 @@
+build
+.cache
+
+# a trash for the project
+garbage
+
+# files
+*.ii
+*.bc
+*.s
+*.o
+
+# stupid clangd
+compile_commands.json
