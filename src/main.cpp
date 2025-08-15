@@ -1,7 +1,8 @@
-#include <iostream>
+#include "opts.h"
+using namespace soft;
 
 int main(int argc, char *argv[])
 {
-  std::cout << "Hello world" << '\n';
+  Opts opts = parse_opts(argc, argv);
   return 0;
 }

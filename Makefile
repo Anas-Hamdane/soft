@@ -3,11 +3,12 @@ BUILD      := ./build
 INCLUDE    := ./include
 
 CXX        := clang++
-CXXFLAGS   := -std=c++17 -Wall -Wextra -save-temps -I$(INCLUDE) -g
+CXXFLAGS   := -std=c++17 -Wall -Wextra -I$(INCLUDE) -g
 
 TARGET     := $(BUILD)/soft
 
-SOURCES := $(SRC)/main.cpp
+SOURCES := $(SRC)/main.cpp \
+					 $(SRC)/opts.cpp
 
 OBJECTS := $(SOURCES:$(SRC)/%.cpp=$(BUILD)/%.o)
 
