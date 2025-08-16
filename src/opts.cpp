@@ -1,3 +1,4 @@
+#include "stl.h"
 #include "opts.h"
 #include <cassert>
 #include <string.h>
@@ -52,4 +53,19 @@ Opts soft::parse_opts(int argc, char *argv[])
   }
 
   return opts;
+}
+
+void soft::help(const char* program, int ec)
+{
+  std::println("Usage:");
+  std::println("  %s <input> [options..]", program);
+  std::println();
+  std::println("Options:");
+  std::println("  -o <output>   specifies the output file");
+  std::println("  -S            only compile, don't link");
+  std::println();
+  std::println("  --emit-asm    emit assembly into the output file");
+  std::println("  --save-temps  saves the temporary files");
+  std::println("  --help        print this help");
+  exit(ec);
 }

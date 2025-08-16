@@ -1,25 +1,8 @@
-#include "opts.h"
+#include "stl.h"
+#include "file.h"
 #include "lexer.h"
-#include <cstdio>
-#include <cstdlib>
+#include "opts.h"
 using namespace soft;
-
-#define println(fmt, ...) printf(fmt "\n" __VA_OPT__(,) __VA_ARGS__)
-
-void help(const char* program, int ec = 0)
-{
-  println("Usage:");
-  println("  %s <input> [options..]", program);
-  println();
-  println("Options:");
-  println("  -o <output>   specifies the output file");
-  println("  -S            only compile, don't link");
-  println();
-  println("  --emit-asm    emit assembly into the output file");
-  println("  --save-temps  saves the temporary files");
-  println("  --help        print this help");
-  exit(ec);
-}
 
 int main(int argc, char *argv[])
 {
@@ -28,5 +11,8 @@ int main(int argc, char *argv[])
   if (opts.help || !opts.input_file)
     help(opts.program, !opts.help);
 
+  std::string content = read_file(opts.input_file);
+  std::vector<Token> tkns = lexer::lex(content);
+  lexer::print_tokens(tkns);
   return 0;
 }

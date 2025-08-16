@@ -6,12 +6,14 @@ BUILD      := ./build
 PCH        := $(PCH_HEADER).gch
 
 CXX        := clang++
-CXXFLAGS   := -std=c++17 -Wall -Wextra -I$(INCLUDE) -g
+CXXFLAGS   := -std=c++23 -Wall -Wextra -I$(INCLUDE) -g
 
 TARGET     := $(BUILD)/soft
 
-RSS := $(SRC)/main.cpp \
-					 $(SRC)/opts.cpp
+RSS        := $(SRC)/main.cpp \
+								$(SRC)/file.cpp \
+								$(SRC)/lexer.cpp \
+								$(SRC)/opts.cpp
 
 OBJS := $(RSS:$(SRC)/%.cpp=$(BUILD)/%.o)
 
@@ -23,7 +25,7 @@ $(TARGET): $(OBJS) $(PCH) | $(BUILD)
 	$(CXX) $(OBJS) -o $(TARGET)
 
 $(BUILD)/%.o: $(SRC)/%.cpp $(PCH) | $(BUILD)
-	$(CXX) -c $< -o $@ $(CXXFLAGS)
+	$(CXX) -c $< -o $@ -include-pch $(PCH) $(CXXFLAGS)
 
 $(PCH): $(PCH_HEADER) | $(BUILD)
 	$(CXX) -x c++-header $< -o $@ $(CXXFLAGS)

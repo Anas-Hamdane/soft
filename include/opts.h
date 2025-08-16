@@ -13,4 +13,5 @@ namespace soft {
   };
 
   Opts parse_opts(int argc, char* argv[]);
+  void help(const char* program, int ec = 0);
 }
