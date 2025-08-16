@@ -1,12 +1,10 @@
 #pragma once
 
-#include <string>
-
 namespace soft {
   struct Opts {
-    std::string program;
-    std::string input_file;
-    std::string output_file;
+    char* program;
+    char* input_file;
+    char* output_file;
 
     bool emit_asm; // don't compile
     bool just_compile; // don't link

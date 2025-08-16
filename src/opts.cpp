@@ -3,16 +3,13 @@
 #include <string.h>
 using namespace soft;
 
-// because I want
-#define null nullptr
-
 Opts soft::parse_opts(int argc, char *argv[])
 {
   Opts opts = 
   {
-    .program = null,
-    .input_file = null,
-    .output_file = null,
+    .program = {},
+    .input_file = {},
+    .output_file = {},
     .emit_asm = false,
     .just_compile = false,
     .save_temps = false,
@@ -23,7 +20,7 @@ Opts soft::parse_opts(int argc, char *argv[])
   for (int i = 1; i < argc; ++i) {
     if (strcmp(argv[i], "-o") == 0) 
     {
-      assert(opts.output_file.empty());
+      assert(opts.output_file == nullptr);
       opts.output_file = argv[i++];
     }
 
@@ -49,7 +46,7 @@ Opts soft::parse_opts(int argc, char *argv[])
 
     else {
       // multiple input files are not supported for now
-      assert(opts.input_file.empty());
+      assert(opts.input_file == nullptr);
       opts.input_file = argv[i++];
     }
   }
