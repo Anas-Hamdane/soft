@@ -73,12 +73,14 @@ struct Token {
   std::string form;
 };
 
-namespace lexer {
-  char peek(off_t offset = 0);
-  char advance(off_t offset = 1);
-  bool match(char c);
+namespace soft {
+  namespace lexer {
+    char peek(off_t offset = 0);
+    char advance(off_t offset = 1);
+    bool match(char c);
 
-  std::vector<Token> lex(std::string src);
-  const char* kndts(Token::Knd knd);
-  void print_tokens(std::vector<Token> tkns);
+    std::vector<Token> lex(std::string src);
+    const char* kndts(Token::Knd knd);
+    void print_tokens(std::vector<Token> tkns);
+  }
 }
