@@ -1,4 +1,5 @@
 #include "opts.h"
+#include "lexer.h"
 #include <cstdio>
 #include <cstdlib>
 using namespace soft;

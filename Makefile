@@ -1,27 +1,32 @@
 SRC        := ./src
-BUILD      := ./build
 INCLUDE    := ./include
+PCH_HEADER := $(INCLUDE)/stl.h
+
+BUILD      := ./build
+PCH        := $(PCH_HEADER).gch
 
 CXX        := clang++
 CXXFLAGS   := -std=c++17 -Wall -Wextra -I$(INCLUDE) -g
 
 TARGET     := $(BUILD)/soft
 
-SOURCES := $(SRC)/main.cpp \
+RSS := $(SRC)/main.cpp \
 					 $(SRC)/opts.cpp
 
-OBJECTS := $(SOURCES:$(SRC)/%.cpp=$(BUILD)/%.o)
+OBJS := $(RSS:$(SRC)/%.cpp=$(BUILD)/%.o)
 
 .PHONY: all clean
 
 all: $(TARGET)
 
-$(TARGET): $(OBJECTS)
-	$(CXX) $(OBJECTS) -o $(TARGET) $(CXXFLAGS)
+$(TARGET): $(OBJS) $(PCH) | $(BUILD)
+	$(CXX) $(OBJS) -o $(TARGET)
 
-$(BUILD)/%.o: $(SRC)/%.cpp | $(BUILD)
-	@mkdir -p $(dir $@)
+$(BUILD)/%.o: $(SRC)/%.cpp $(PCH) | $(BUILD)
 	$(CXX) -c $< -o $@ $(CXXFLAGS)
+
+$(PCH): $(PCH_HEADER) | $(BUILD)
+	$(CXX) -x c++-header $< -o $@ $(CXXFLAGS)
 
 $(BUILD):
 	mkdir -p $(BUILD)
