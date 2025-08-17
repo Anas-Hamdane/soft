@@ -1,4 +1,7 @@
 #include "parser.h"
+#include <cassert>
+#include <cfloat>
+#include <cmath>
 
 namespace soft {
   namespace parser {
@@ -55,6 +58,302 @@ namespace soft {
       return (knd == Token::Knd::Eq);
     }
 
+    uint64_t parse_decimal(const std::string& str)
+    {
+      uint64_t result = 0;
+      for (char c : str) {
+        // skip separators
+        if (c == '\'')
+          continue;
+
+        int digit = c - '0';
+        if (result > (UINT64_MAX - digit) / 10)
+        {
+          std::println(stderr, "decimal literal overflow for {}", str);
+          exit(1);
+        }
+
+        result = (result * 10) + digit;
+      }
+
+      return result;
+    }
+    uint64_t parse_hex(const std::string& str)
+    {
+      uint64_t result = 0;
+      assert(str.starts_with("0x") || str.starts_with("0X"));
+
+      // start after the prefix
+      for (size_t i = 2; i < str.length(); ++i) {
+        unsigned char c = str[i];
+
+        // skip separators
+        if (c == '\'')
+          continue;
+
+        int digit;
+
+        if (c >= '0' && c <= '9')
+          digit = c - '0';
+        else if (c >= 'a' && c <= 'f')
+          digit = c - 'a' + 10;
+        else
+          digit = c - 'A' + 10;
+
+        if (result > (UINT64_MAX >> 4))
+        {
+          std::println(stderr, "Hex literal overflow for {}", str);
+          exit(1);
+        }
+
+        result = (result << 4) | digit;
+      }
+
+      return result;
+    }
+    uint64_t parse_octal(const std::string& str)
+    {
+      uint64_t result = 0;
+      assert(str.starts_with("0o") || str.starts_with("0O"));
+
+      // skip prefix 
+      for (size_t i = 2; i < str.length(); ++i) {
+        unsigned char c = str[i];
+
+        // skip separators
+        if (c == '\'')
+          continue;
+
+        int digit = c - '0';
+        if (result > (UINT64_MAX >> 3))
+        {
+          std::println(stderr, "Octal literal overflow {}", str);
+          exit(1);
+        }
+
+        result = (result << 3) | digit;
+      }
+
+      return result;
+    }
+    uint64_t parse_binary(const std::string& str)
+    {
+      uint64_t result = 0;
+      assert(str.starts_with("0b") || str.starts_with("0B"));
+
+      // skip prefix
+      for (size_t i = 2; i < str.length(); ++i) {
+        unsigned char c = str[i];
+
+        // skip separators
+        if (c == '\'')
+          continue;
+
+        if (result > (UINT64_MAX >> 1))
+        {
+          std::println(stderr, "Binary literal overflow {}", str);
+          exit(1);
+        }
+
+        result = (result << 1) | (c - '0');
+      }
+
+      return result;
+    }
+    uint64_t parse_integer(const std::string& str)
+    {
+      size_t base = lexer::number_base(str);
+
+      switch (base)
+      {
+        case 2:  return parse_binary(str);
+        case 8:  return parse_octal(str);
+        case 10: return parse_decimal(str);
+        case 16: return parse_hex(str);
+        default: std::unreachable();
+      }
+    }
+    double parse_fdecimal(const std::string& str)
+    {
+      auto digit = [](char c) {
+        return c - '0';
+      };
+
+      enum class Section {
+        Integer,
+        Fraction,
+        Exponent
+      } section = Section::Integer;
+
+      double result = 0;
+      size_t frac_size = 0;
+      bool neg_expo = false;
+      uint64_t expo = 0;
+
+      for (char c : str)
+      {
+        if (c == '\'')
+          continue;
+
+        if (c == '.')
+        {
+          section = Section::Fraction;
+          continue;
+        }
+
+        if (c == 'e' || c == 'E')
+        {
+          section = Section::Exponent;
+          continue;
+        }
+
+        if (c == '-' || c == '+')
+        {
+          neg_expo = c == '-';
+          continue;
+        }
+
+        double d = digit(c);
+        if (section == Section::Integer)
+        {
+          if (result > (DBL_MAX - d) / 10.0)
+          {
+            std::println("Decimal floating point overflow {}", str);
+            exit(1);
+          }
+          result = (result * 10.0) + d;
+        }
+        else if (section == Section::Fraction)
+        {
+          double delta = d / pow(10.0, ++frac_size);
+          if (result > (DBL_MAX - delta))
+          {
+            std::println("Decimal floating point overflow {}", str);
+            exit(1);
+          }
+          result += delta;
+        }
+        else
+        {
+          if (expo > (UINT64_MAX - (uint64_t) d) / 10)
+          {
+            std::println("Exponent overflow in decimal floating point {}", str);
+            exit(1);
+          }
+          expo = (expo * 10) + (uint64_t) d;
+        }
+      }
+
+      result *= pow(10.0, neg_expo ? -expo : expo);
+      if (std::isinf(result))
+      {
+        std::println(stderr, "floating point overflow {}", str);
+        exit(1);
+      }
+
+      return result;
+    }
+    double parse_fhex(const std::string& str)
+    {
+      assert(str.starts_with("0x") || str.starts_with("0X"));
+      auto digit = [](char c) {
+        if (c >= '0' && c <= '9')
+          return c - '0';
+        else if (c >= 'a' && c <= 'f')
+          return c - 'a' + 10;
+        else
+          return c - 'A' + 10;
+      };
+
+      enum class Section {
+        Integer,
+        Fraction,
+        Exponent
+      } section = Section::Integer;
+
+      double result = 0;
+      size_t frac_size = 0;
+      bool neg_expo = false;
+      uint64_t expo = 0;
+
+      // skip prefix
+      for (size_t i = 2; i < str.length(); ++i)
+      {
+        char c = str[i];
+
+        if (c == '\'')
+          continue;
+
+        if (c == '.')
+        {
+          section = Section::Fraction;
+          continue;
+        }
+
+        if (c == 'p' || c == 'P')
+        {
+          section = Section::Exponent;
+          continue;
+        }
+
+        if (c == '-' || c == '+')
+        {
+          neg_expo = c == '-';
+          continue;
+        }
+
+        double d = digit(c);
+        if (section == Section::Integer)
+        {
+          if (result > (DBL_MAX - d) / 16.0)
+          {
+            std::println("Hax floating point overflow {}", str);
+            exit(1);
+          }
+          result = (result * 16.0) + d;
+        }
+        else if (section == Section::Fraction)
+        {
+          double delta = d / pow(16.0, ++frac_size);
+          if (result > (DBL_MAX - delta))
+          {
+            std::println("Hex floating point overflow {}", str);
+            exit(1);
+          }
+          result += delta;
+        }
+        else
+        {
+          if (expo > (UINT64_MAX - (uint64_t) d) / 10)
+          {
+            std::println("Exponent overflow in decimal floating point {}", str);
+            exit(1);
+          }
+          expo = (expo * 10) + (uint64_t) d;
+        }
+      }
+
+      result *= pow(2.0, neg_expo ? -expo : expo);
+      if (std::isinf(result))
+      {
+        std::println(stderr, "floating point overflow {}", str);
+        exit(1);
+      }
+
+      return result;
+    }
+    double parse_float(const std::string& str)
+    {
+      size_t base = lexer::number_base(str);
+
+      switch (base)
+      {
+        case 10: return parse_fdecimal(str);
+        case 16: return parse_fhex(str);
+        default: std::unreachable();
+      }
+    }
+
     std::unique_ptr<Type> parse_type()
     {
       Token token = expect(Token::Knd::DataType);
@@ -67,9 +366,7 @@ namespace soft {
       else
         type.knd = Type::Knd::Float;
 
-      // TODO: use parse decimal here too
-      type.byte = 4;
-
+      type.byte = parse_integer(token.form.substr(1));
       return std::make_unique<Type>(type);
     }
     std::unique_ptr<Expr> parse_primary()
@@ -110,7 +407,7 @@ namespace soft {
           std::string form = advance().form;
 
           auto integer = std::make_unique<IntLit>();
-          integer->v = 0; // TODO: we need the numerical parsers
+          integer->v = parse_integer(form);
 
           return std::make_unique<Expr>(std::move(integer));
         }
@@ -119,7 +416,7 @@ namespace soft {
           std::string form = advance().form;
 
           auto fp = std::make_unique<FloatLit>();
-          fp->v = 0.0; // TODO: same here
+          fp->v = parse_float(form);
 
           return std::make_unique<Expr>(std::move(fp));
         }

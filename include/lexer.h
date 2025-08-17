@@ -79,6 +79,7 @@ namespace soft {
     char advance(off_t offset = 1);
     bool match(char c);
 
+    size_t number_base(const std::string& str);
     std::vector<Token> lex(std::string src);
     const char* kndts(Token::Knd knd);
     void print_tokens(std::vector<Token> tkns);

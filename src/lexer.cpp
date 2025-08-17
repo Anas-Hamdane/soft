@@ -133,7 +133,7 @@ namespace soft {
       return (src[index] == c);
     }
 
-    size_t number_base(std::string str)
+    size_t number_base(const std::string& str)
     {
       if (str.starts_with("0b") || str.starts_with("0B"))
         return 2;
@@ -146,7 +146,7 @@ namespace soft {
 
       return 10;
     }
-    Token::Knd scan_binary(std::string lexeme)
+    Token::Knd scan_binary(const std::string& lexeme)
     {
       if (lexeme.length() == 2)
       {
@@ -179,7 +179,7 @@ namespace soft {
 
       return Token::Knd::IntLit;
     }
-    Token::Knd scan_octal(std::string lexeme)
+    Token::Knd scan_octal(const std::string& lexeme)
     {
       if (lexeme.length() == 2)
       {
@@ -212,7 +212,7 @@ namespace soft {
 
       return Token::Knd::IntLit;
     }
-    Token::Knd scan_hex(std::string lexeme)
+    Token::Knd scan_hex(const std::string& lexeme)
     {
       enum class Section {
         Integer,
@@ -307,7 +307,7 @@ namespace soft {
 
       return knd;
     }
-    Token::Knd scan_decimal(std::string lexeme)
+    Token::Knd scan_decimal(const std::string& lexeme)
     {
       enum class Section {
         Integer,
@@ -402,7 +402,7 @@ namespace soft {
 
       return knd;
     }
-    Token::Knd scan_number(std::string lexeme)
+    Token::Knd scan_number(const std::string& lexeme)
     {
       size_t base = number_base(lexeme);
 
