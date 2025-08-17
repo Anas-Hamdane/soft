@@ -132,25 +132,21 @@ namespace soft {
 
       return (src[index] == c);
     }
-    bool startswith(const std::string& str, const std::string& cmp)
-    {
-      return str.compare(0, cmp.length(), cmp) == 0;
-    }
 
     size_t number_base(std::string str)
     {
-      if (startswith(str, "0b") || startswith(str, "0B"))
+      if (str.starts_with("0b") || str.starts_with("0B"))
         return 2;
 
-      if (startswith(str, "0o") || startswith(str, "0O"))
+      if (str.starts_with("0o") || str.starts_with("0O"))
         return 8;
 
-      if (startswith(str, "0x") || startswith(str, "OX"))
+      if (str.starts_with("0x") || str.starts_with("OX"))
         return 16;
 
       return 10;
     }
-    Token::Knd scan_bin(std::string lexeme)
+    Token::Knd scan_binary(std::string lexeme)
     {
       if (lexeme.length() == 2)
       {
@@ -183,7 +179,7 @@ namespace soft {
 
       return Token::Knd::IntLit;
     }
-    Token::Knd scan_oct(std::string lexeme)
+    Token::Knd scan_octal(std::string lexeme)
     {
       if (lexeme.length() == 2)
       {
@@ -311,7 +307,7 @@ namespace soft {
 
       return knd;
     }
-    Token::Knd scan_dec(std::string lexeme)
+    Token::Knd scan_decimal(std::string lexeme)
     {
       enum class Section {
         Integer,
@@ -411,10 +407,10 @@ namespace soft {
       size_t base = number_base(lexeme);
 
       switch (base) {
-        case 2:  return scan_bin(lexeme);
-        case 8:  return scan_oct(lexeme);
+        case 2:  return scan_binary(lexeme);
+        case 8:  return scan_octal(lexeme);
         case 16: return scan_hex(lexeme);
-        case 10: return scan_dec(lexeme);
+        case 10: return scan_decimal(lexeme);
       }
 
       std::unreachable();
@@ -522,7 +518,7 @@ namespace soft {
         Token tkn = { Token::Knd::Invalid, "" };
         for (auto [punct, knd] : Puncts)
         {
-          if (startswith(src.substr(index), std::string(punct)))
+          if (src.substr(index).starts_with(punct))
           {
             // we don't need a lexeme here too
             tkn = { knd, "" };

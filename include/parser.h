@@ -17,6 +17,7 @@ struct ArrLit;
 struct Identifier;
 struct VarDecl;
 struct FnCall;
+struct AssgnOp;
 struct BinOp;
 struct UnOp;
 
@@ -28,8 +29,8 @@ struct FnDef;
 // the main variants
 using Expr = std::variant<std::unique_ptr<IntLit>, std::unique_ptr<FloatLit>, std::unique_ptr<CharLit>,
                           std::unique_ptr<StrLit>, std::unique_ptr<ArrLit>, std::unique_ptr<Identifier>,
-                          std::unique_ptr<VarDecl>, std::unique_ptr<FnCall>, std::unique_ptr<BinOp>,
-                          std::unique_ptr<UnOp>>;
+                          std::unique_ptr<VarDecl>, std::unique_ptr<FnCall>, std::unique_ptr<AssgnOp>,
+                          std::unique_ptr<BinOp>, std::unique_ptr<UnOp>>;
 
 using Stmt = std::variant<std::unique_ptr<Return>, std::unique_ptr<Expmt>,
                           std::unique_ptr<FnDecl>, std::unique_ptr<FnDef>>;
@@ -61,6 +62,10 @@ struct VarDecl {
 struct FnCall {
   std::string name;
   std::vector<std::unique_ptr<Expr>> args;
+};
+struct AssgnOp {
+  std::unique_ptr<Expr> var;
+  std::unique_ptr<Expr> val;
 };
 struct BinOp {
   std::unique_ptr<Expr> lhs;
@@ -98,10 +103,11 @@ namespace soft {
 
     std::unique_ptr<Type> parse_type();
     std::unique_ptr<Expr> parse_primary();
-    std::unique_ptr<Expr> parse_expression();
+    std::unique_ptr<Expr> parse_expression(const int min_prec = 0);
     std::unique_ptr<Stmt> parse_function();
     std::unique_ptr<Stmt> parse_return();
     std::unique_ptr<Stmt> parse_expmt();
+    std::unique_ptr<Stmt> parse_stmt();
 
     std::vector<std::unique_ptr<Stmt>> parse(std::vector<Token> tokens);
   }
