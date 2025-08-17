@@ -1,7 +1,9 @@
 #include "stl.h"
 #include "file.h"
 #include "lexer.h"
+#include "parser.h"
 #include "opts.h"
+
 using namespace soft;
 
 int main(int argc, char *argv[])
@@ -13,6 +15,7 @@ int main(int argc, char *argv[])
 
   std::string content = read_file(opts.input_file);
   std::vector<Token> tkns = lexer::lex(content);
-  lexer::print_tokens(tkns);
+
+  auto ast = parser::parse(tkns);
   return 0;
 }

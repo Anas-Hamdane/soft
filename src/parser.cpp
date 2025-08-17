@@ -449,7 +449,7 @@ namespace soft {
           return expr;
         }
         default:
-        std::println("Implement support for expressions that starts with `{}`\n", lexer::kndts(peek().knd));
+        std::println("Implement support for expressions that starts with `{}`", lexer::kndts(peek().knd));
         return nullptr;
       }
     }
@@ -521,17 +521,20 @@ namespace soft {
       }
 
       expect(Token::Knd::OpenCurly);
+
       auto def = std::make_unique<FnDef>();
       def->decl = std::move(decl);
       while (!match(Token::Knd::CloseCurly))
         def->body.push_back(parse_stmt());
 
+      expect(Token::Knd::CloseCurly);
       return std::make_unique<Stmt>(std::move(def));
     }
     std::unique_ptr<Stmt> parse_return()
     {
       expect(Token::Knd::Return);
       auto expr = parse_expression();
+      expect(Token::Knd::SemiColon);
       return std::make_unique<Stmt>(std::make_unique<Return>(std::move(expr)));
     }
     std::unique_ptr<Stmt> parse_expmt()
@@ -550,7 +553,7 @@ namespace soft {
       }
     }
 
-    std::vector<std::unique_ptr<Stmt>> parse(std::vector<Token> tokens)
+    std::vector<std::unique_ptr<Stmt>> parse(const std::vector<Token>& tokens)
     {
       std::vector<std::unique_ptr<Stmt>> ast;
       tkns = tokens;

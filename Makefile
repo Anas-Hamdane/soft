@@ -11,9 +11,10 @@ CXXFLAGS   := -std=c++23 -Wall -Wextra -I$(INCLUDE) -g
 TARGET     := $(BUILD)/soft
 
 RSS        := $(SRC)/main.cpp \
+								$(SRC)/opts.cpp \
 								$(SRC)/file.cpp \
 								$(SRC)/lexer.cpp \
-								$(SRC)/opts.cpp
+								$(SRC)/parser.cpp \
 
 OBJS := $(RSS:$(SRC)/%.cpp=$(BUILD)/%.o)
 

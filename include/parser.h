@@ -109,6 +109,6 @@ namespace soft {
     std::unique_ptr<Stmt> parse_expmt();
     std::unique_ptr<Stmt> parse_stmt();
 
-    std::vector<std::unique_ptr<Stmt>> parse(std::vector<Token> tokens);
+    std::vector<std::unique_ptr<Stmt>> parse(const std::vector<Token>& tokens);
   }
 }
