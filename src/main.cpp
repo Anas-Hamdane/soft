@@ -16,6 +16,6 @@ int main(int argc, char *argv[])
   std::string content = read_file(opts.input_file);
   std::vector<Token> tkns = lexer::lex(content);
 
-  auto ast = parser::parse(tkns);
+  auto ast = ast::generate(tkns);
   return 0;
 }

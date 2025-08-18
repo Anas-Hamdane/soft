@@ -9,6 +9,7 @@ garbage
 *.bc
 *.s
 *.o
+include/*.gch
 
 # stupid clangd
 compile_commands.json

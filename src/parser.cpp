@@ -4,7 +4,7 @@
 #include <cmath>
 
 namespace soft {
-  namespace parser {
+  namespace ast {
     std::vector<Token> tkns;
     size_t index;
 
@@ -58,7 +58,7 @@ namespace soft {
       return (knd == Token::Knd::Eq);
     }
 
-    uint64_t parse_decimal(const std::string& str)
+    uint64_t generate_decimal(const std::string& str)
     {
       uint64_t result = 0;
       for (char c : str) {
@@ -78,7 +78,7 @@ namespace soft {
 
       return result;
     }
-    uint64_t parse_hex(const std::string& str)
+    uint64_t generate_hex(const std::string& str)
     {
       uint64_t result = 0;
       assert(str.starts_with("0x") || str.starts_with("0X"));
@@ -111,7 +111,7 @@ namespace soft {
 
       return result;
     }
-    uint64_t parse_octal(const std::string& str)
+    uint64_t generate_octal(const std::string& str)
     {
       uint64_t result = 0;
       assert(str.starts_with("0o") || str.starts_with("0O"));
@@ -136,7 +136,7 @@ namespace soft {
 
       return result;
     }
-    uint64_t parse_binary(const std::string& str)
+    uint64_t generate_binary(const std::string& str)
     {
       uint64_t result = 0;
       assert(str.starts_with("0b") || str.starts_with("0B"));
@@ -160,20 +160,20 @@ namespace soft {
 
       return result;
     }
-    uint64_t parse_integer(const std::string& str)
+    uint64_t generate_integer(const std::string& str)
     {
       size_t base = lexer::number_base(str);
 
       switch (base)
       {
-        case 2:  return parse_binary(str);
-        case 8:  return parse_octal(str);
-        case 10: return parse_decimal(str);
-        case 16: return parse_hex(str);
+        case 2:  return generate_binary(str);
+        case 8:  return generate_octal(str);
+        case 10: return generate_decimal(str);
+        case 16: return generate_hex(str);
         default: std::unreachable();
       }
     }
-    double parse_fdecimal(const std::string& str)
+    double generate_fdecimal(const std::string& str)
     {
       auto digit = [](char c) {
         return c - '0';
@@ -253,7 +253,7 @@ namespace soft {
 
       return result;
     }
-    double parse_fhex(const std::string& str)
+    double generate_fhex(const std::string& str)
     {
       assert(str.starts_with("0x") || str.starts_with("0X"));
       auto digit = [](char c) {
@@ -342,19 +342,19 @@ namespace soft {
 
       return result;
     }
-    double parse_float(const std::string& str)
+    double generate_float(const std::string& str)
     {
       size_t base = lexer::number_base(str);
 
       switch (base)
       {
-        case 10: return parse_fdecimal(str);
-        case 16: return parse_fhex(str);
+        case 10: return generate_fdecimal(str);
+        case 16: return generate_fhex(str);
         default: std::unreachable();
       }
     }
 
-    std::unique_ptr<Type> parse_type()
+    std::unique_ptr<Type> generate_type()
     {
       Token token = expect(Token::Knd::DataType);
 
@@ -366,10 +366,10 @@ namespace soft {
       else
         type.knd = Type::Knd::Float;
 
-      type.byte = parse_integer(token.form.substr(1));
+      type.byte = generate_integer(token.form.substr(1));
       return std::make_unique<Type>(type);
     }
-    std::unique_ptr<Expr> parse_primary()
+    std::unique_ptr<Expr> generate_primary()
     {
       switch (peek().knd)
       {
@@ -391,7 +391,7 @@ namespace soft {
               if (match(Token::Knd::Comma))
                 advance();
 
-              call->args.push_back(parse_expression());
+              call->args.push_back(generate_expression());
             } while (match(Token::Knd::Comma));
 
             expect(Token::Knd::CloseParent);
@@ -407,7 +407,7 @@ namespace soft {
           std::string form = advance().form;
 
           auto integer = std::make_unique<IntLit>();
-          integer->v = parse_integer(form);
+          integer->v = generate_integer(form);
 
           return std::make_unique<Expr>(std::move(integer));
         }
@@ -416,7 +416,7 @@ namespace soft {
           std::string form = advance().form;
 
           auto fp = std::make_unique<FloatLit>();
-          fp->v = parse_float(form);
+          fp->v = generate_float(form);
 
           return std::make_unique<Expr>(std::move(fp));
         }
@@ -430,13 +430,13 @@ namespace soft {
           if (match(Token::Knd::Colon))
           {
             advance();
-            decl->type = parse_type();
+            decl->type = generate_type();
           }
 
           if (match(Token::Knd::Eq))
           {
             advance();
-            decl->init = parse_expression();
+            decl->init = generate_expression();
           }
 
           return std::make_unique<Expr>(std::move(decl));
@@ -444,7 +444,7 @@ namespace soft {
         case Token::Knd::OpenParent: 
         {
           advance(); // (
-          auto expr = parse_expression();
+          auto expr = generate_expression();
           expect(Token::Knd::CloseParent); // )
           return expr;
         }
@@ -453,9 +453,9 @@ namespace soft {
         return nullptr;
       }
     }
-    std::unique_ptr<Expr> parse_expression(const int min_prec)
+    std::unique_ptr<Expr> generate_expression(const int min_prec)
     {
-      std::unique_ptr<Expr> left = parse_primary();
+      std::unique_ptr<Expr> left = generate_primary();
 
       while (true) {
         Token::Knd op = peek().knd;
@@ -465,7 +465,7 @@ namespace soft {
         advance();
 
         int next_min = right_associative(op) ? prec : (prec + 1);
-        std::unique_ptr<Expr> right = parse_expression(next_min);
+        std::unique_ptr<Expr> right = generate_expression(next_min);
 
         if (op == Token::Knd::Eq)
         {
@@ -486,7 +486,7 @@ namespace soft {
 
       return left;
     }
-    std::unique_ptr<Stmt> parse_function()
+    std::unique_ptr<Stmt> generate_function()
     {
       expect(Token::Knd::Fn);
       auto decl = std::make_unique<FnDecl>();
@@ -503,7 +503,7 @@ namespace soft {
         std::unique_ptr<VarDecl> param;
         param->name = expect(Token::Knd::Identifier).form;
         expect(Token::Knd::Colon);
-        param->type = parse_type();
+        param->type = generate_type();
         decl->params.push_back(std::move(param));
       } while(match(Token::Knd::Comma));
       expect(Token::Knd::CloseParent);
@@ -511,7 +511,7 @@ namespace soft {
       if (match(Token::Knd::RightArrow))
       {
         advance();
-        decl->type = parse_type();
+        decl->type = generate_type();
       }
 
       if (match(Token::Knd::SemiColon))
@@ -523,37 +523,37 @@ namespace soft {
       expect(Token::Knd::OpenCurly);
 
       auto def = std::make_unique<FnDef>();
-      def->decl = std::move(decl);
+      def->dec = std::move(decl);
       while (!match(Token::Knd::CloseCurly))
-        def->body.push_back(parse_stmt());
+        def->body.push_back(generate_stmt());
 
       expect(Token::Knd::CloseCurly);
       return std::make_unique<Stmt>(std::move(def));
     }
-    std::unique_ptr<Stmt> parse_return()
+    std::unique_ptr<Stmt> generate_return()
     {
       expect(Token::Knd::Return);
-      auto expr = parse_expression();
+      auto expr = generate_expression();
       expect(Token::Knd::SemiColon);
       return std::make_unique<Stmt>(std::make_unique<Return>(std::move(expr)));
     }
-    std::unique_ptr<Stmt> parse_expmt()
+    std::unique_ptr<Stmt> generate_expmt()
     {
-      auto expr = parse_expression();
+      auto expr = generate_expression();
       expect(Token::Knd::SemiColon);
       return std::make_unique<Stmt>(std::make_unique<Expmt>(std::move(expr)));
     }
-    std::unique_ptr<Stmt> parse_stmt()
+    std::unique_ptr<Stmt> generate_stmt()
     {
       switch (peek().knd)
       {
-        case Token::Knd::Fn:     return parse_function();
-        case Token::Knd::Return: return parse_return();
-        default:                 return parse_expmt();
+        case Token::Knd::Fn:     return generate_function();
+        case Token::Knd::Return: return generate_return();
+        default:                 return generate_expmt();
       }
     }
 
-    std::vector<std::unique_ptr<Stmt>> parse(const std::vector<Token>& tokens)
+    std::vector<std::unique_ptr<Stmt>> generate(const std::vector<Token>& tokens)
     {
       std::vector<std::unique_ptr<Stmt>> ast;
       tkns = tokens;
@@ -561,7 +561,7 @@ namespace soft {
 
       while (!match(Token::Knd::EndOfFile))
       {
-        auto stmt = parse_stmt();
+        auto stmt = generate_stmt();
         ast.push_back(std::move(stmt));
       }
 
