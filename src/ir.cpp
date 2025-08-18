@@ -376,7 +376,7 @@ namespace soft {
         return; // don't do anything
 
       Value v = generate_expr(rt->expr);    
-      current_function->terminator->emplace<Return>(v);
+      current_function->terminator = Return { v };
     }
     void generate_stmt(const std::unique_ptr<ast::Stmt>& stmt)
     {

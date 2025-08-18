@@ -1,8 +1,9 @@
 #include "stl.h"
+#include "opts.h"
 #include "file.h"
 #include "lexer.h"
 #include "parser.h"
-#include "opts.h"
+#include "ir.h"
 
 using namespace soft;
 
@@ -17,5 +18,6 @@ int main(int argc, char *argv[])
   std::vector<Token> tkns = lexer::lex(content);
 
   auto ast = ast::generate(tkns);
+  ir::Program program = ir::generate(ast);
   return 0;
 }

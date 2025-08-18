@@ -15,6 +15,7 @@ RSS        := $(SRC)/main.cpp \
 								$(SRC)/file.cpp \
 								$(SRC)/lexer.cpp \
 								$(SRC)/parser.cpp \
+								$(SRC)/ir.cpp \
 
 OBJS := $(RSS:$(SRC)/%.cpp=$(BUILD)/%.o)
 
