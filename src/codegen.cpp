@@ -11,7 +11,7 @@ namespace soft {
     std::string out;
     off_t offset; // stack offset
 
-    char suffix(Type type)
+    char suffix(const Type& type)
     {
       if (is_float(type))
       {
@@ -179,13 +179,13 @@ namespace soft {
       std::unreachable();
     }
 
-    void generate_instruction(ir::Instruction& instr)
+    void generate_instruction(const ir::Instruction& instr)
     {
       switch (instr.index())
       {
         case 0: // Alloca
         {
-          ir::Alloca& alloca = std::get<0>(instr);
+          const ir::Alloca& alloca = std::get<0>(instr);
           Memory mem = { alloca.type, (offset += alloca.type.byte) };
           stack[alloca.reg.id] = mem;
           break;
@@ -209,7 +209,7 @@ namespace soft {
         default: std::unreachable();
       }
     }
-    void generate_params(std::vector<ir::Register>& params)
+    void generate_params(const std::vector<ir::Register>& params)
     {
       const static std::array<std::string_view, 6> nregs = 
              { "rdi", "rsi", "rdx", "rcx", "r8", "r9" };
@@ -261,7 +261,7 @@ namespace soft {
         }
       }
     }
-    void generate_function(ir::Function& fn)
+    void generate_function(const ir::Function& fn)
     {
       if (fn.mod == ir::Function::Mod::Declaration)
         return; // do nothing
@@ -281,7 +281,7 @@ namespace soft {
         generate_instruction(instr);
     }
 
-    std::string generate(ir::Program program)
+    std::string generate(const ir::Program& program)
     {
       out += ".section .text\n";
 

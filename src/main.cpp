@@ -4,6 +4,7 @@
 #include "lexer.h"
 #include "parser.h"
 #include "ir.h"
+#include "codegen.h"
 
 using namespace soft;
 
@@ -19,5 +20,8 @@ int main(int argc, char *argv[])
 
   auto ast = ast::generate(tkns);
   ir::Program program = ir::generate(ast);
+
+  std::string code = codegen::generate(program);
+  std::print("{}", code);
   return 0;
 }
