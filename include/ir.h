@@ -26,10 +26,6 @@ namespace soft {
       Value src;
       Register dst;
     };
-    struct AssgnOp {
-      Register dst;
-      Value v;
-    };
     struct BinOp {
       enum class Op { Add, Sub, Mul, Div } op;
       Value lhs, rhs;
@@ -44,7 +40,7 @@ namespace soft {
       Value src;
       Register dst;
     };
-    using Instruction = std::variant<Alloca, Store, BinOp,  AssgnOp, UnOp,   Conv>;
+    using Instruction = std::variant<Alloca, Store, BinOp, UnOp, Conv>;
 
     struct Function {
       std::string name;

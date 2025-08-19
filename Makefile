@@ -6,7 +6,7 @@ BUILD      := ./build
 PCH        := $(PCH_HEADER).gch
 
 CXX        := clang++
-CXXFLAGS   := -std=c++23 -Wall -Wextra -fno-asm -I$(INCLUDE) -g
+CXXFLAGS   := -std=c++23 -Wall -Wextra -I$(INCLUDE) -g
 
 TARGET     := $(BUILD)/soft
 
