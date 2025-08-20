@@ -106,6 +106,8 @@ namespace soft {
             c.v = (int64_t) std::get<0>(c.v);
           else
             goto float_dst;
+
+          break;
         }
         case 1: // int64_t
         {
@@ -113,6 +115,8 @@ namespace soft {
             c.v = (uint64_t) std::get<1>(c.v);
           else
             goto float_dst;
+
+          break;
         }
         case 2: // double
         {
@@ -120,6 +124,8 @@ namespace soft {
             c.v = (int64_t) std::get<2>(c.v);
           else
             c.v = (uint64_t) std::get<2>(c.v);
+
+          break;
         }
       }
 
@@ -157,8 +163,9 @@ float_dst:
         {
           auto& lit = std::get<0>(*expr);
           Constant constant;
-          constant.v = lit->v;
+          constant.v = (uint64_t) lit->v;
           constant.type.knd = Type::Knd::UInt;
+
           // if the value is bigger than LONG_MAX_VAL
           // it will throw an overflow in parsing
           // therefore it is not possible here
@@ -173,7 +180,7 @@ float_dst:
         {
           auto& lit = std::get<1>(*expr);
           Constant constant;
-          constant.v = lit->v;
+          constant.v = (double) lit->v;
           constant.type.knd = Type::Knd::Float;
 
           if (lit->v < FLOAT_MAX_VAL)

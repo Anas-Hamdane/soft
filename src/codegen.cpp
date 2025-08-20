@@ -7,46 +7,39 @@
 
 namespace soft {
   namespace codegen {
-    constexpr std::array<GPR, 14> gpr = {{
-      {GPR::Knd::RAX, 8, false},
-      {GPR::Knd::RBX, 8, false},
-      {GPR::Knd::RCX, 8, false},
-      {GPR::Knd::RDX, 8, false},
-      {GPR::Knd::RSI, 8, false},
-      {GPR::Knd::RDI, 8, false},
-      // {GPR::Knd::RSP, 8, false},
-      // {GPR::Knd::RBP, 8, false},
-      {GPR::Knd::R8 , 8, false},
-      {GPR::Knd::R9 , 8, false},
-      {GPR::Knd::R10, 8, false},
-      {GPR::Knd::R11, 8, false},
-      {GPR::Knd::R12, 8, false},
-      {GPR::Knd::R13, 8, false},
-      {GPR::Knd::R14, 8, false},
-      {GPR::Knd::R15, 8, false},
+    std::array<GPR, 9> gprs = {{
+      {GPR::Knd::RAX, false},
+      {GPR::Knd::RCX, false},
+      {GPR::Knd::RDX, false},
+      {GPR::Knd::RSI, false},
+      {GPR::Knd::RDI, false},
+      {GPR::Knd::R8 , false},
+      {GPR::Knd::R9 , false},
+      {GPR::Knd::R10, false},
+      {GPR::Knd::R11, false},
     }};
-    constexpr std::array<XMM, 16> xmm = {{
-      {XMM::Knd::XMM0 , 8, false},
-      {XMM::Knd::XMM1 , 8, false},
-      {XMM::Knd::XMM2 , 8, false},
-      {XMM::Knd::XMM3 , 8, false},
-      {XMM::Knd::XMM4 , 8, false},
-      {XMM::Knd::XMM5 , 8, false},
-      {XMM::Knd::XMM6 , 8, false},
-      {XMM::Knd::XMM7 , 8, false},
-      {XMM::Knd::XMM8 , 8, false},
-      {XMM::Knd::XMM9 , 8, false},
-      {XMM::Knd::XMM10, 8, false},
-      {XMM::Knd::XMM11, 8, false},
-      {XMM::Knd::XMM12, 8, false},
-      {XMM::Knd::XMM13, 8, false},
-      {XMM::Knd::XMM14, 8, false},
-      {XMM::Knd::XMM15, 8, false},
+    std::array<XMM, 16> xmms = {{
+      {XMM::Knd::XMM0 , false},
+      {XMM::Knd::XMM1 , false},
+      {XMM::Knd::XMM2 , false},
+      {XMM::Knd::XMM3 , false},
+      {XMM::Knd::XMM4 , false},
+      {XMM::Knd::XMM5 , false},
+      {XMM::Knd::XMM6 , false},
+      {XMM::Knd::XMM7 , false},
+      {XMM::Knd::XMM8 , false},
+      {XMM::Knd::XMM9 , false},
+      {XMM::Knd::XMM10, false},
+      {XMM::Knd::XMM11, false},
+      {XMM::Knd::XMM12, false},
+      {XMM::Knd::XMM13, false},
+      {XMM::Knd::XMM14, false},
+      {XMM::Knd::XMM15, false},
     }};
-    std::unordered_map<size_t, Memory> stack;
+
+    std::unordered_map<size_t, std::variant<Register, Memory>> registers;
     std::string out;
     off_t offset; // stack offset
-
 
     std::string gpr_by_size(const GPR::Knd& knd, size_t byte)
     {
@@ -99,16 +92,16 @@ namespace soft {
           unreachable();
       }
     }
-    std::string resolve_constant(const ir::Constant& constant)
+    std::string resolve_constant(const ir::Constant& c)
     {
       std::string form;
-      switch (constant.v.index())
+      switch (c.v.index())
       {
         case 0: // uint64_t
-          form += "$" + std::to_string(std::get<0>(constant.v));
+          form += "$" + std::to_string(std::get<0>(c.v));
           break;
         case 1: // int64_t
-          form += "$" + std::to_string(std::get<1>(constant.v));
+          form += "$" + std::to_string(std::get<1>(c.v));
           break;
         case 2: // double
         {
@@ -117,6 +110,36 @@ namespace soft {
       }
 
       return form;
+    }
+    std::string resolve_slot(const ir::Slot& s)
+    {
+      std::variant<Register, Memory>& r = registers[s.id];
+      switch (r.index())
+      {
+        case 0: // Register
+        {
+          const Register& reg = std::get<0>(r);
+          if (is_float(reg.type))
+            return xmm_by_size(xmms[reg.index].knd, reg.type.byte);
+          else
+            return gpr_by_size(gprs[reg.index].knd, reg.type.byte);
+        }
+        case 1: // Memory
+        {
+          const Memory& mem = std::get<1>(r);
+          return std::format("-{}(%rbp)", mem.offset);
+        }
+      }
+      unreachable();
+    }
+    std::string resolve_value(const ir::Value& v)
+    {
+      switch (v.index())
+      {
+        case 0: return resolve_constant(std::get<0>(v));
+        case 1: return resolve_slot(std::get<1>(v));
+      }
+      unreachable();
     }
 
     char suffix(const Type& type)
@@ -343,14 +366,24 @@ namespace soft {
       {
         case 0: // Alloca
         {
-          const ir::Alloca& alloca = std::get<0>(instr);
+          auto& alloca = std::get<0>(instr);
           Memory mem = { alloca.type, (offset += alloca.type.byte) };
-          stack[alloca.reg.id] = mem;
+          registers[alloca.reg.id] = mem;
           return;
         }
         case 1: // Store
         {
+          auto& store = std::get<1>(instr);
+          std::string src = resolve_value(store.src);
+          std::string dst = resolve_slot(store.dst);
 
+          const char suff = suffix(store.dst.type);
+          if (is_float(store.dst.type))
+            f("  movs{} {}, {}", suff, src, dst);
+          else
+            f("  mov{} {}, {}", suff, src, dst);
+
+          return;
         }
         case 2: // BinOp
         {
@@ -367,7 +400,7 @@ namespace soft {
         default: unreachable();
       }
     }
-    void generate_params(const std::vector<ir::Register>& params)
+    void generate_params(const std::vector<ir::Slot>& params)
     {
       static constexpr std::array<std::string_view, 6> integer_regs = {
         "%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"
@@ -391,13 +424,13 @@ namespace soft {
             if (fr_idx < float_regs.size())
             {
               f("  movs{} {}, -{}(%rbp)", suff, float_regs[fr_idx++], offset);
-              stack[param.id] = { param.type, offset };
+              registers[param.id] = Memory { param.type, offset };
             }
             else
             {
               f("  movs{} {}(%rbp), %xmm0", suff, stack_params_offset);
               f("  movs{} %xmm0, -{}(%rbp)", suff, offset);
-              stack[param.id] = { param.type, offset };
+              registers[param.id] = Memory { param.type, offset };
               stack_params_offset += param.type.byte;
             }
             break;
@@ -408,7 +441,7 @@ namespace soft {
             if (ir_idx < integer_regs.size())
             {
               f("  mov{} {}, -{}(%rbp)", suff, integer_regs[ir_idx++], offset);
-              stack[param.id] = { param.type, offset };
+              registers[param.id] = Memory { param.type, offset };
             }
             else
             {
@@ -416,7 +449,7 @@ namespace soft {
               const std::string ir = register_by_size("%rax", param.type.byte);
               f("  mov{} {}(%rbp), {}", suff, stack_params_offset, ir);
               f("  mov{} {}, -{}(%rbp)", suff, ir, offset);
-              stack[param.id] = { param.type, offset };
+              registers[param.id] = Memory { param.type, offset };
               stack_params_offset += param.type.byte;
             }
             break;
@@ -433,7 +466,7 @@ namespace soft {
       f(".type {}, @function", fn.name);
       f("{}:", fn.name);
 
-      // proloque
+      // prologue
       f("  pushq %rbp");
       f("  movq %rsp, %rbp");
       offset = 0;

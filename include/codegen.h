@@ -6,12 +6,16 @@ namespace soft {
       Type type;
       off_t offset;
     };
+    struct Register {
+      Type type;
+      size_t index;
+    };
+
     struct GPR {
       enum class Knd : int {
-        RAX = 0, RBX, RCX, RDX, RSI, RDI, /* RSP, RBP, */
-        R8, R9, R10, R11, R12, R13, R14, R15
+        RAX = 0, RCX, RDX, RSI, RDI,
+        R8, R9, R10, R11
       } knd;
-      size_t byte;
       bool reserved;
     };
     struct XMM {
@@ -20,7 +24,6 @@ namespace soft {
         XMM6, XMM7, XMM8, XMM9, XMM10, XMM11,
         XMM12, XMM13, XMM14, XMM15
       } knd;
-      size_t byte;
       bool reserved;
     };
 
@@ -30,7 +33,7 @@ namespace soft {
 
     void generate_terminator(const ir::Terminator& term);
     void generate_instruction(const ir::Instruction& instr);
-    void generate_params(const std::vector<ir::Register>& params);
+    void generate_params(const std::vector<ir::Slot>& params);
     void generate_fn_prologue(const ir::Function& fn);
     void generate_function(const ir::Function& fn);
 
