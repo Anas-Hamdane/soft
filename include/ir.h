@@ -7,11 +7,11 @@ namespace soft {
       Type type;
       std::variant<uint64_t, int64_t, double> v;
     };
-    struct Register {
+    struct Slot {
       Type type;
       size_t id;
     };
-    using Value = std::variant<Constant, Register>;
+    using Value = std::variant<Constant, Slot>;
 
     struct Return {
       Value v;
@@ -20,25 +20,25 @@ namespace soft {
 
     struct Alloca {
       Type type;
-      Register reg;
+      Slot reg;
     };
     struct Store {
       Value src;
-      Register dst;
+      Slot dst;
     };
     struct BinOp {
       enum class Op { Add, Sub, Mul, Div } op;
       Value lhs, rhs;
-      Register dst;
+      Slot dst;
     };
     struct UnOp {
       enum class Op { Neg, Not } op;
       Value operand;
-      Register dst;
+      Slot dst;
     };
     struct Conv {
       Value src;
-      Register dst;
+      Slot dst;
     };
     using Instruction = std::variant<Alloca, Store, BinOp, UnOp, Conv>;
 
@@ -46,7 +46,7 @@ namespace soft {
       std::string name;
       std::optional<Type> type;
       std::optional<Terminator> terminator;
-      std::vector<Register> params;
+      std::vector<Slot> params;
       std::vector<Instruction> instrs;
       enum class Mod { Definition, Declaration } mod;
     };

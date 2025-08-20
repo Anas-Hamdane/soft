@@ -8,7 +8,7 @@
 
 namespace soft {
   namespace ir {
-    std::unordered_map<std::string, Register> symbol_table;
+    std::unordered_map<std::string, Slot> symbol_table;
     std::unordered_map<std::string, Function*> fns_table;
     std::unordered_map<std::string, Global> globals;
     Function* current_function = nullptr;
@@ -85,7 +85,7 @@ namespace soft {
 
       return result;
     }
-    void generate_store(Value src, Register dst) {
+    void generate_store(Value src, Slot dst) {
       current_function->instrs.push_back(Store { src, dst });
     }
     void cast_constant(Constant& c, const Type& type)
@@ -139,11 +139,11 @@ float_dst:
       if (v.index() == 0)
         return cast_constant(std::get<0>(v), type);
 
-      Register dst = { type, register_id++ };
+      Slot dst = { type, register_id++ };
       current_function->instrs.push_back( Conv{ v, dst });
       v = dst;
     }
-    Value generate_assignment(Value v, Register dst)
+    Value generate_assignment(Value v, Slot dst)
     {
       cast(v, dst.type);
       generate_store(v, dst);
@@ -241,7 +241,7 @@ float_dst:
           if (dec->type)
             type = *dec->type;
 
-          Register reg = { type, register_id++ };
+          Slot reg = { type, register_id++ };
           symbol_table[dec->name] = reg;
 
           Alloca alloca{ .type = type, .reg = reg };
@@ -294,7 +294,7 @@ float_dst:
           Type lt = value_type(lhs);
           Type rt = value_type(rhs);
 
-          Register dst;
+          Slot dst;
           dst.id = register_id++;
           dst.type.byte = std::max(lt.byte, rt.byte);
 
@@ -323,7 +323,7 @@ float_dst:
             default:                unreachable();
           }
 
-          Register dst;
+          Slot dst;
           dst.id = register_id++;
           dst.type = value_type(opr);
 
@@ -358,7 +358,7 @@ float_dst:
           exit(1);
         }
 
-        Register reg = { *param->type, register_id++ };
+        Slot reg = { *param->type, register_id++ };
         fn.params.emplace_back(reg);
         symbol_table[param->name] = reg;
       }
@@ -396,7 +396,7 @@ float_dst:
           exit(1);
         }
 
-        Register reg = { *param->type, register_id++ };
+        Slot reg = { *param->type, register_id++ };
         fn.params.emplace_back(reg);
         symbol_table[param->name] = reg;
       }
