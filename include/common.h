@@ -14,4 +14,10 @@ namespace soft {
   // 64-bit float
   constexpr double DOUBLE_MAX_VAL = 1.7976931348623157e+308;
   constexpr double DOUBLE_MIN_VAL = -DOUBLE_MAX_VAL;
+
+  [[noreturn]] void __unreachable__impl(const char* file, int line, const char* func);
+#define unreachable() __unreachable__impl(__FILE__, __LINE__, __func__)
+
+  [[noreturn]] void __todo__impl(const char* file, int line, const char* func);
+#define todo() __todo__impl(__FILE__, __LINE__, __func__)
 }
