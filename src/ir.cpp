@@ -88,40 +88,56 @@ namespace soft {
     void generate_store(Value src, Register dst) {
       current_function->instrs.push_back(Store { src, dst });
     }
-    void cast(Value& v, Type type)
+    void cast_constant(Constant& c, const Type& type)
+    {
+      if (c.type.byte != type.byte)
+        c.type.byte = type.byte;
+
+      // if it's just the byte difference
+      // we don't need to cast anything
+      if (c.type.knd == type.knd)
+        return;
+
+      switch (c.v.index())
+      {
+        case 0: // uint64_t
+        {
+          if (is_int(type))
+            c.v = (int64_t) std::get<0>(c.v);
+          else
+            goto float_dst;
+        }
+        case 1: // int64_t
+        {
+          if (is_uint(type))
+            c.v = (uint64_t) std::get<1>(c.v);
+          else
+            goto float_dst;
+        }
+        case 2: // double
+        {
+          if (is_int(type))
+            c.v = (int64_t) std::get<2>(c.v);
+          else
+            c.v = (uint64_t) std::get<2>(c.v);
+        }
+      }
+
+      // casted successfully
+      c.type.knd = type.knd;
+      return;
+
+float_dst:
+      todo();
+    }
+    void cast(Value& v, const Type& type)
     {
       Type vt = value_type(v);
       if (vt.knd == type.knd && vt.byte == type.byte)
         return;
 
-      if (v.index() == 0 && !is_float(type))
-      {
-        auto& constant = std::get<0>(v);
-        constant.type = type;
-        switch (constant.v.index()) {
-          case 0: // uint64_t
-          {
-            assert(is_int(type));
-            constant.v = (int) std::get<0>(constant.v);
-            return;
-          }
-          case 1: // int64_t
-          {
-            assert(!is_uint(type));
-            constant.v = (uint64_t) std::get<1>(constant.v);
-            return;
-          }
-          case 2: // double
-          {
-            if (is_int(type))
-              constant.v = (int) std::get<2>(constant.v);
-            else
-              constant.v = (uint64_t) std::get<2>(constant.v);
-
-            return;
-          }
-        }
-      }
+      if (v.index() == 0)
+        return cast_constant(std::get<0>(v), type);
 
       Register dst = { type, register_id++ };
       current_function->instrs.push_back( Conv{ v, dst });
