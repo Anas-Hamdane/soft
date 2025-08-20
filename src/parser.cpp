@@ -367,6 +367,7 @@ namespace soft {
         type.knd = Type::Knd::Float;
 
       type.byte = generate_integer(token.form.substr(1));
+      type.byte /= 8; // to get the number of byte not bit
       return std::make_unique<Type>(type);
     }
     std::unique_ptr<Expr> generate_primary()
@@ -500,7 +501,7 @@ namespace soft {
         if (match(Token::Knd::Comma))
           advance();
 
-        std::unique_ptr<VarDecl> param;
+        auto param = std::make_unique<VarDecl>();
         param->name = expect(Token::Knd::Identifier).form;
         expect(Token::Knd::Colon);
         param->type = generate_type();

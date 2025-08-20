@@ -1,8 +1,10 @@
 #include "ir.h"
 #include "common.h"
+#include <cassert>
 
 #define is_float(l) (l.knd == Type::Knd::Float)
 #define is_int(l) (l.knd == Type::Knd::Int)
+#define is_uint(l) (l.knd == Type::Knd::UInt)
 
 namespace soft {
   namespace ir {
@@ -22,25 +24,25 @@ namespace soft {
         case 1: // Register
           return std::get<1>(v).type;
         default:
-          std::unreachable();
+          unreachable();
       }
     }
     Constant evaluate_constants(BinOp::Op op, Constant l, Constant r)
     {
       auto constant_double_value = [](Constant c) {
         switch (c.v.index()) {
-          case 0: return (double) std::get<0>(c.v);
-          case 1: return (double) std::get<1>(c.v);
-          case 2: return std::get<2>(c.v);
-          default: std::unreachable();
+          case 0:  return (double) std::get<0>(c.v);
+          case 1:  return (double) std::get<1>(c.v);
+          case 2:  return std::get<2>(c.v);
+          default: unreachable();
         }
       };
       auto constant_int64_value = [](Constant c) {
         switch (c.v.index()) {
-          case 0: return (int64_t) std::get<0>(c.v);
-          case 1: return std::get<1>(c.v);
-          case 2: return (int64_t) std::get<2>(c.v);
-          default: std::unreachable();
+          case 0:  return (int64_t) std::get<0>(c.v);
+          case 1:  return std::get<1>(c.v);
+          case 2:  return (int64_t) std::get<2>(c.v);
+          default: unreachable();
         }
       };
 
@@ -50,7 +52,7 @@ namespace soft {
           case BinOp::Op::Sub: return l - r;
           case BinOp::Op::Mul: return l * r;
           case BinOp::Op::Div: return l / r;
-          default: std::unreachable();
+          default:             unreachable();
         }
       };
       auto calculate_int64_constant = [](BinOp::Op op, int64_t l, int64_t r) {
@@ -59,7 +61,7 @@ namespace soft {
           case BinOp::Op::Sub: return l - r;
           case BinOp::Op::Mul: return l * r;
           case BinOp::Op::Div: return l / r;
-          default: std::unreachable();
+          default:             unreachable();
         }
       };
 
@@ -91,6 +93,35 @@ namespace soft {
       Type vt = value_type(v);
       if (vt.knd == type.knd && vt.byte == type.byte)
         return;
+
+      if (v.index() == 0 && !is_float(type))
+      {
+        auto& constant = std::get<0>(v);
+        constant.type = type;
+        switch (constant.v.index()) {
+          case 0: // uint64_t
+          {
+            assert(is_int(type));
+            constant.v = (int) std::get<0>(constant.v);
+            return;
+          }
+          case 1: // int64_t
+          {
+            assert(!is_uint(type));
+            constant.v = (uint64_t) std::get<1>(constant.v);
+            return;
+          }
+          case 2: // double
+          {
+            if (is_int(type))
+              constant.v = (int) std::get<2>(constant.v);
+            else
+              constant.v = (uint64_t) std::get<2>(constant.v);
+
+            return;
+          }
+        }
+      }
 
       Register dst = { type, register_id++ };
       current_function->instrs.push_back( Conv{ v, dst });
@@ -127,7 +158,7 @@ namespace soft {
           auto& lit = std::get<1>(*expr);
           Constant constant;
           constant.v = lit->v;
-          constant.type.knd = Type::Knd::Int;
+          constant.type.knd = Type::Knd::Float;
 
           if (lit->v < FLOAT_MAX_VAL)
             constant.type.byte = 4;
@@ -238,7 +269,7 @@ namespace soft {
             case Token::Knd::Minus: op = BinOp::Op::Sub; break;
             case Token::Knd::Mul:   op = BinOp::Op::Mul; break;
             case Token::Knd::Div:   op = BinOp::Op::Div; break;
-            default:                std::unreachable();
+            default:                unreachable();
           }
           
           if (lhs.index() == 0 && rhs.index() == 0)
@@ -273,7 +304,7 @@ namespace soft {
           switch (unop->op) {
             case Token::Knd::Minus: op = UnOp::Op::Neg; break;
             case Token::Knd::Not:   op = UnOp::Op::Not; break;
-            default:                std::unreachable();
+            default:                unreachable();
           }
 
           Register dst;
@@ -283,7 +314,7 @@ namespace soft {
           current_function->instrs.push_back(UnOp{op, opr, dst});
           return dst;
         }
-        default: std::unreachable();
+        default: unreachable();
       }
     }
 
@@ -376,6 +407,11 @@ namespace soft {
         return; // don't do anything
 
       Value v = generate_expr(rt->expr);    
+      Type vt = value_type(v);
+
+      if (vt.knd != current_function->type->knd || vt.byte != current_function->type->byte)
+        cast(v, *current_function->type);
+
       current_function->terminator = Return { v };
     }
     void generate_stmt(const std::unique_ptr<ast::Stmt>& stmt)
@@ -386,7 +422,7 @@ namespace soft {
         case 1:  generate_expr(std::get<1>(*stmt)->expr); break;
         case 2:  generate_fndec(std::get<2>(*stmt));      break;
         case 3:  generate_fndef(std::get<3>(*stmt));      break;
-        default: std::unreachable();
+        default: unreachable();
       }
     }
 
