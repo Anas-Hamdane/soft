@@ -1,4 +1,5 @@
 #include "parser.h"
+#include "common.h"
 #include <cassert>
 #include <cfloat>
 #include <cmath>
@@ -170,7 +171,7 @@ namespace soft {
         case 8:  return generate_octal(str);
         case 10: return generate_decimal(str);
         case 16: return generate_hex(str);
-        default: std::unreachable();
+        default: unreachable();
       }
     }
     double generate_fdecimal(const std::string& str)
@@ -350,7 +351,7 @@ namespace soft {
       {
         case 10: return generate_fdecimal(str);
         case 16: return generate_fhex(str);
-        default: std::unreachable();
+        default: unreachable();
       }
     }
 

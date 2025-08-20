@@ -1,4 +1,5 @@
 #include "stl.h"
+#include "common.h"
 #include "lexer.h"
 
 namespace soft {
@@ -413,7 +414,7 @@ namespace soft {
         case 10: return scan_decimal(lexeme);
       }
 
-      std::unreachable();
+      unreachable();
     }
 
     std::vector<Token> lex(std::string source)
