@@ -371,34 +371,18 @@ namespace soft {
         case 0: // Return
         {
           auto& ret = std::get<0>(term);
-          switch (ret.v.index())
-          {
-            case 0: // Constant
-            {
-              auto& constant = std::get<0>(ret.v);
-              const char suff = suffix(constant.type);
-              std::string src = resolve_constant(constant);
 
-              std::string mov = "mov";
-              std::string dst = return_register(constant.type);
+          std::string mov = resolve_mov(ret.type);
+          std::string src = resolve_value(ret.v);
+          std::string dst = return_register(ret.type);
 
-              if (is_float(constant.type))
-                mov += 's' + suff;
-              else
-                mov += suff;
-
-              f("  {} {}, {}", mov, src, dst);
-              break;
-            }
-            case 1: // Register
-            {
-              todo();
-            }
-          }
-
+          f("  {} {}, {}", mov, src, dst);
           f("  popq %rbp");
           f("  retq");
+          return;
         }
+        default:
+          unreachable();
       }
     }
     void generate_instruction(const ir::Instruction& instr)
@@ -419,15 +403,12 @@ namespace soft {
         case 2: // Store
         {
           auto& store = std::get<2>(instr);
+
+          std::string mov = resolve_mov(store.dst.type);
           std::string src = resolve_value(store.src);
           std::string dst = resolve_slot(store.dst);
 
-          const char suff = suffix(store.dst.type);
-          if (is_float(store.dst.type))
-            f("  movs{} {}, {}", suff, src, dst);
-          else
-            f("  mov{} {}, {}", suff, src, dst);
-
+          f("  {} {}, {}", mov, src, dst);
           return;
         }
         case 3: // Load

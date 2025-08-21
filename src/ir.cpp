@@ -445,13 +445,13 @@ float_dst:
     {
       if (!current_function)
       {
-        std::println("`return` outside of a function? are you crazy?");
+        std::println(stderr, "`return` outside of a function? are you crazy?");
         exit(1);
       }
 
-      if (!current_function->type.has_value() && rt->expr)
+      if (!current_function->type.has_value())
       {
-        std::println("returning an expression in a void function is not allowed");
+        std::println(stderr, "`return` statement inside a void function is not allowed");
         exit(1);
       }
 
@@ -464,7 +464,7 @@ float_dst:
       if (vt.knd != current_function->type->knd || vt.byte != current_function->type->byte)
         cast(v, *current_function->type);
 
-      current_function->terminator = Return { v };
+      current_function->terminator = Return { *current_function->type, v };
     }
     void generate_stmt(const std::unique_ptr<ast::Stmt>& stmt)
     {

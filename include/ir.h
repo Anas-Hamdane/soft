@@ -14,6 +14,7 @@ namespace soft {
     using Value = std::variant<Constant, Slot>;
 
     struct Return {
+      Type type;
       Value v;
     };
     using Terminator = std::variant<Return>;
