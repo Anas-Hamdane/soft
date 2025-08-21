@@ -7,90 +7,90 @@
 
 namespace soft {
   namespace codegen {
-    std::array<GPR, 9> gprs = {{
-      {GPR::Knd::RAX, false},
-      {GPR::Knd::RCX, false},
-      {GPR::Knd::RDX, false},
-      {GPR::Knd::RSI, false},
-      {GPR::Knd::RDI, false},
-      {GPR::Knd::R8 , false},
-      {GPR::Knd::R9 , false},
-      {GPR::Knd::R10, false},
-      {GPR::Knd::R11, false},
-    }};
-    std::array<XMM, 16> xmms = {{
-      {XMM::Knd::XMM0 , false},
-      {XMM::Knd::XMM1 , false},
-      {XMM::Knd::XMM2 , false},
-      {XMM::Knd::XMM3 , false},
-      {XMM::Knd::XMM4 , false},
-      {XMM::Knd::XMM5 , false},
-      {XMM::Knd::XMM6 , false},
-      {XMM::Knd::XMM7 , false},
-      {XMM::Knd::XMM8 , false},
-      {XMM::Knd::XMM9 , false},
-      {XMM::Knd::XMM10, false},
-      {XMM::Knd::XMM11, false},
-      {XMM::Knd::XMM12, false},
-      {XMM::Knd::XMM13, false},
-      {XMM::Knd::XMM14, false},
-      {XMM::Knd::XMM15, false},
+    std::array<std::pair<Register::Knd, bool>, 25> pool = {{
+      {Register::Knd::RAX  , false},
+      {Register::Knd::RCX  , false},
+      {Register::Knd::RDX  , false},
+      {Register::Knd::RSI  , false},
+      {Register::Knd::RDI  , false},
+      {Register::Knd::R8   , false},
+      {Register::Knd::R9   , false},
+      {Register::Knd::R10  , false},
+      {Register::Knd::R11  , false},
+      {Register::Knd::XMM0 , false},
+      {Register::Knd::XMM1 , false},
+      {Register::Knd::XMM2 , false},
+      {Register::Knd::XMM3 , false},
+      {Register::Knd::XMM4 , false},
+      {Register::Knd::XMM5 , false},
+      {Register::Knd::XMM6 , false},
+      {Register::Knd::XMM7 , false},
+      {Register::Knd::XMM8 , false},
+      {Register::Knd::XMM9 , false},
+      {Register::Knd::XMM10, false},
+      {Register::Knd::XMM11, false},
+      {Register::Knd::XMM12, false},
+      {Register::Knd::XMM13, false},
+      {Register::Knd::XMM14, false},
+      {Register::Knd::XMM15, false},
     }};
 
     std::unordered_map<size_t, std::variant<Register, Memory>> registers;
     std::string out;
     off_t offset; // stack offset
 
-    std::string gpr_by_size(const GPR::Knd& knd, size_t byte)
+    char suffix(const Type& type)
     {
-      static constexpr std::array<std::string, 14> regs64 = {
-        "%rax", "%rbx", "%rcx", "%rdx", "%rsi", "%rdi", /* "%rsp", "%rbp", */
-        "%r8", "%r9", "%r10", "%r11", "%r12", "%r13", "%r14", "%r15"
-      };
-
-      static const std::array<std::string, 14> regs32 = {
-        "%eax", "%ebx", "%ecx", "%edx", "%esi", "%edi", /* "%esp", "%ebp", */
-        "%r8d", "%r9d", "%r10d", "%r11d", "%r12d", "%r13d", "%r14d", "%r15d"
-      };
-
-      static const std::array<std::string, 14> regs16 = {
-        "%ax", "%bx", "%cx", "%dx", "%si", "%di", /* "%sp", "%bp", */
-        "%r8w", "%r9w", "%r10w", "%r11w", "%r12w", "%r13w", "%r14w", "%r15w"
-      };
-
-      static const std::array<std::string, 14> regs8 = {
-        "%al", "%bl", "%cl", "%dl", "%sil", "%dil", /* "%spl", "%bpl", */
-        "%r8b", "%r9b", "%r10b", "%r11b", "%r12b", "%r13b", "%r14b", "%r15b"
-      };
-
-      int index = static_cast<int>(knd);
-
-      switch (byte) {
-        case 8:  return regs64[index];
-        case 4:  return regs32[index];
-        case 2:  return regs16[index];
-        case 1:  return regs8[index];
+      if (is_float(type))
+      {
+        switch (type.byte)
+        {
+          case 4:  return 's';
+          case 8:  return 'd';
+          default: unreachable();
+        }
+      }
+      switch (type.byte) 
+      {
+        case 1:  return 'b';
+        case 2:  return 'w';
+        case 4:  return 'l';
+        case 8:  return 'q';
         default: unreachable();
       }
     }
-    std::string xmm_by_size(const XMM::Knd& knd, size_t byte)
+    std::string register_to_string(const Register& r)
     {
-      static constexpr std::array<std::string, 16> regs = {
-        "%xmm0", "%xmm1", "%xmm2", "%xmm3", "%xmm4", "%xmm5",
-        "%xmm6", "%xmm7", "%xmm8", "%xmm9", "%xmm10", "%xmm11",
-        "%xmm12", "%xmm13", "%xmm14", "%xmm15"
+      static constexpr std::array<std::string, 9> gpr64 = {
+        "rax", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11"
+      };
+      static constexpr std::array<std::string, 9> gpr32 = {
+        "eax", "ecx", "edx", "esi", "edi", "r8d", "r9d", "r10d", "r11d"
+      };
+      static constexpr std::array<std::string, 9> gpr16 = {
+        "ax", "cx", "dx", "si", "di", "r8w", "r9w", "r10w", "r11w"
+      };
+      static constexpr std::array<std::string, 9> gpr8 = {
+        "al", "cl", "dl", "sil", "dil", "r8b", "r9b", "r10b", "r11b"
+      };
+      static constexpr std::array<std::string, 16> xmms = {
+        "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6",
+        "xmm7", "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13",
+        "xmm14", "xmm15",
       };
 
-      int index = static_cast<int>(knd);
+      size_t index = (int) r.knd;
+      if (index >= 9)
+        return xmms[index];
 
-      switch (byte)
+      switch (r.type.byte)
       {
-        case 4:
-        case 8:
-          return regs[index];
-        default:
-          unreachable();
+        case 1: return "%" + gpr8[index];
+        case 2: return "%" + gpr16[index];
+        case 4: return "%" + gpr32[index];
+        case 8: return "%" + gpr64[index];
       }
+      unreachable();
     }
     std::string resolve_constant(const ir::Constant& c)
     {
@@ -119,10 +119,7 @@ namespace soft {
         case 0: // Register
         {
           const Register& reg = std::get<0>(r);
-          if (is_float(reg.type))
-            return xmm_by_size(xmms[reg.index].knd, reg.type.byte);
-          else
-            return gpr_by_size(gprs[reg.index].knd, reg.type.byte);
+          return register_to_string(reg);
         }
         case 1: // Memory
         {
@@ -141,27 +138,76 @@ namespace soft {
       }
       unreachable();
     }
-
-    char suffix(const Type& type)
+    std::string return_register(const Type& type)
     {
-      if (is_float(type))
+      switch (type.knd)
       {
-        switch (type.byte)
+        case Type::Knd::Float:
+          return "%xmm0";
+        case Type::Knd::Int:
+        case Type::Knd::UInt:
+          switch (type.byte)
+          {
+            case 1: return "%al";
+            case 2: return "%ax";
+            case 4: return "%eax";
+            case 8: return "%rax";
+            default: unreachable();
+          }
+      }
+      unreachable();
+    }
+    std::string resolve_mov(const Type& type)
+    {
+      std::string result = "mov";
+      if (is_float(type))
+        result += 's';
+
+      result += suffix(type);
+      return result;
+    }
+    void allocate_register(const ir::Slot& s)
+    {
+      switch (s.type.knd)
+      {
+        case Type::Knd::Int:
+        case Type::Knd::UInt:
         {
-          case 4:  return 's';
-          case 8:  return 'd';
-          default: unreachable();
+          for (size_t i = 0; i < 9; ++i)
+          {
+            if (!pool[i].second) // not reserved
+            {
+              Register regstr = { s.type, pool[i].first };
+              registers[s.id] = regstr;
+              return;
+            }
+          }
+
+          // fallback to memory
+          Memory mem = { s.type, (offset += s.type.byte) };
+          registers[s.id] = mem;
+          return;
+        }
+        case Type::Knd::Float:
+        {
+          for (size_t i = 9; i < pool.size(); ++i)
+          {
+            if (!pool[i].second) // not reserved
+            {
+              Register regstr = { s.type, pool[i].first };
+              registers[s.id] = regstr;
+              return;
+            }
+          }
+
+          // fallback to memory
+          Memory mem = { s.type, (offset += s.type.byte) };
+          registers[s.id] = mem;
+          return;
         }
       }
-      switch (type.byte) 
-      {
-        case 1:  return 'b';
-        case 2:  return 'w';
-        case 4:  return 'l';
-        case 8:  return 'q';
-        default: unreachable();
-      }
     }
+
     std::string register_by_size(const std::string& r, size_t byte)
     {
       std::string base = r;
@@ -334,17 +380,12 @@ namespace soft {
               std::string src = resolve_constant(constant);
 
               std::string mov = "mov";
-              std::string dst;
-              if (constant.type.knd == Type::Knd::Float)
-              {
-                dst = xmm_by_size(XMM::Knd::XMM0, constant.type.byte);
+              std::string dst = return_register(constant.type);
+
+              if (is_float(constant.type))
                 mov += 's' + suff;
-              }
               else
-              {
-                dst = gpr_by_size(GPR::Knd::RAX, constant.type.byte);
                 mov += suff;
-              }
 
               f("  {} {}, {}", mov, src, dst);
               break;
@@ -368,12 +409,16 @@ namespace soft {
         {
           auto& alloca = std::get<0>(instr);
           Memory mem = { alloca.type, (offset += alloca.type.byte) };
-          registers[alloca.reg.id] = mem;
+          registers[alloca.slot.id] = mem;
           return;
         }
-        case 1: // Store
+        case 1: // Conv
         {
-          auto& store = std::get<1>(instr);
+          todo();
+        }
+        case 2: // Store
+        {
+          auto& store = std::get<2>(instr);
           std::string src = resolve_value(store.src);
           std::string dst = resolve_slot(store.dst);
 
@@ -385,17 +430,25 @@ namespace soft {
 
           return;
         }
-        case 2: // BinOp
+        case 3: // Load
         {
+          auto& load = std::get<3>(instr);
+          allocate_register(load.dst);
 
+          std::string mov = resolve_mov(load.dst.type);
+          std::string src = resolve_value(load.src);
+          std::string dst = resolve_slot(load.dst);
+
+          f("  {} {}, {}", mov, src, dst);
+          return;
         }
-        case 3: // UnOp
+        case 5: // BinOp
         {
-
+          todo();
         }
-        case 4: // Conv
+        case 6: // UnOp
         {
-
+          todo();
         }
         default: unreachable();
       }

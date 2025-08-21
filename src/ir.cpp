@@ -2,6 +2,7 @@
 #include "common.h"
 #include <cassert>
 
+#undef alloca
 #define is_float(l) (l.knd == Type::Knd::Float)
 #define is_int(l) (l.knd == Type::Knd::Int)
 #define is_uint(l) (l.knd == Type::Knd::UInt)
@@ -15,7 +16,32 @@ namespace soft {
     size_t register_id = 0;
     Program program;
 
-    Type value_type(Value v)
+    void alloca(const Type& type, const Slot& dst)
+    {
+      current_function->instrs.push_back( Alloca { type, dst } );
+    }
+    void store(const Value& src, const Slot& dst)
+    {
+      current_function->instrs.push_back( Store { src, dst } );
+    }
+    void load(const Value& src, const Slot& dst)
+    {
+      current_function->instrs.push_back( Load { src, dst } );
+    }
+    void conv(const Value& src, const Slot& dst)
+    {
+      current_function->instrs.push_back( Conv { src, dst } );
+    }
+    void binop(BinOp::Op op, const Value& lhs, const Value& rhs, const Slot& dst)
+    {
+     current_function->instrs.push_back( BinOp { op, lhs, rhs, dst } );
+    }
+    void unop(UnOp::Op op, const Value& opr, const Slot& dst)
+    {
+      current_function->instrs.push_back( UnOp { op, opr, dst } );
+    }
+
+    Type value_type(const Value& v)
     {
       switch (v.index())
       {
@@ -85,9 +111,6 @@ namespace soft {
 
       return result;
     }
-    void generate_store(Value src, Slot dst) {
-      current_function->instrs.push_back(Store { src, dst });
-    }
     void cast_constant(Constant& c, const Type& type)
     {
       if (c.type.byte != type.byte)
@@ -136,24 +159,31 @@ namespace soft {
 float_dst:
       todo();
     }
-    void cast(Value& v, const Type& type)
+    void cast(Value& src, const Type& type)
     {
-      Type vt = value_type(v);
+      Type vt = value_type(src);
       if (vt.knd == type.knd && vt.byte == type.byte)
         return;
 
-      if (v.index() == 0)
-        return cast_constant(std::get<0>(v), type);
+      if (src.index() == 0)
+        return cast_constant(std::get<0>(src), type);
 
       Slot dst = { type, register_id++ };
-      current_function->instrs.push_back( Conv{ v, dst });
-      v = dst;
+      conv(src, dst);
+      src = dst;
     }
-    Value generate_assignment(Value v, Slot dst)
+    Value generate_assignment(Value src, Slot dst)
     {
-      cast(v, dst.type);
-      generate_store(v, dst);
-      return v;
+      cast(src, dst.type);
+
+      if (src.index() == 1) // Register
+      {
+        Slot ldst = { dst.type, register_id++ };
+        load(src, ldst); src = ldst;
+      }
+
+      store(src, dst);
+      return src;
     }
     Value generate_expr(const std::unique_ptr<ast::Expr>& expr)
     {
@@ -211,7 +241,7 @@ float_dst:
         case 5: // Identifier
         {
           auto& ide = std::get<5>(*expr);
-          if (symbol_table.find(ide->name) != symbol_table.end())
+          if (symbol_table.find(ide->name) == symbol_table.end())
           {
             std::println("Use of undeclared identifier {}", ide->name);
             exit(1);
@@ -248,14 +278,13 @@ float_dst:
           if (dec->type)
             type = *dec->type;
 
-          Slot reg = { type, register_id++ };
-          symbol_table[dec->name] = reg;
+          Slot slot = { type, register_id++ };
+          symbol_table[dec->name] = slot;
 
-          Alloca alloca{ .type = type, .reg = reg };
-          current_function->instrs.push_back(alloca);
+          alloca(type, slot);
 
           if (initialized)
-            return generate_assignment(value, reg);
+            return generate_assignment(value, slot);
 
           return {};
         }
@@ -269,24 +298,24 @@ float_dst:
         {
           auto& assgn = std::get<8>(*expr);
           Value val = generate_expr(assgn->val);
-          Value var = generate_expr(assgn->var);
+          Value dst = generate_expr(assgn->var);
 
-          if (var.index() != 1) // not a Register
+          if (dst.index() != 1) // not a Register
           {
             std::println("Cannot assign to a non-variable");
             exit(1);
           }
 
-          return generate_assignment(val, std::get<1>(var));
+          return generate_assignment(val, std::get<1>(dst));
         }
         case 9: // BinOp
         {
-          auto& binop = std::get<9>(*expr);
-          Value lhs = generate_expr(binop->lhs);
-          Value rhs = generate_expr(binop->rhs);
+          auto& operation = std::get<9>(*expr);
+          Value lhs = generate_expr(operation->lhs);
+          Value rhs = generate_expr(operation->rhs);
 
           BinOp::Op op;
-          switch (binop->op)
+          switch (operation->op)
           {
             case Token::Knd::Plus:  op = BinOp::Op::Add; break;
             case Token::Knd::Minus: op = BinOp::Op::Sub; break;
@@ -315,16 +344,16 @@ float_dst:
           cast(lhs, dst.type);
           cast(rhs, dst.type);
 
-          current_function->instrs.push_back(BinOp{ op, lhs, rhs, dst });
+          binop(op, lhs, rhs, dst);
           return dst;
         }
         case 10: // UnOp
         {
-          auto& unop = std::get<10>(*expr);
-          Value opr = generate_expr(unop->oprand);
+          auto& operation = std::get<10>(*expr);
+          Value opr = generate_expr(operation->oprand);
 
           UnOp::Op op;
-          switch (unop->op) {
+          switch (operation->op) {
             case Token::Knd::Minus: op = UnOp::Op::Neg; break;
             case Token::Knd::Not:   op = UnOp::Op::Not; break;
             default:                unreachable();
@@ -334,7 +363,7 @@ float_dst:
           dst.id = register_id++;
           dst.type = value_type(opr);
 
-          current_function->instrs.push_back(UnOp{op, opr, dst});
+          unop(op, opr, dst);
           return dst;
         }
         default: unreachable();

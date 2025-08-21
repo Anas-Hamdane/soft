@@ -20,9 +20,17 @@ namespace soft {
 
     struct Alloca {
       Type type;
-      Slot reg;
+      Slot slot;
     };
     struct Store {
+      Value src;
+      Slot dst;
+    };
+    struct Load {
+      Value src;
+      Slot dst;
+    };
+    struct Conv {
       Value src;
       Slot dst;
     };
@@ -36,11 +44,7 @@ namespace soft {
       Value operand;
       Slot dst;
     };
-    struct Conv {
-      Value src;
-      Slot dst;
-    };
-    using Instruction = std::variant<Alloca, Store, BinOp, UnOp, Conv>;
+    using Instruction = std::variant<Alloca, Conv, Store, Load, BinOp, UnOp>;
 
     struct Function {
       std::string name;

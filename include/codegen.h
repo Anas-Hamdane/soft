@@ -2,34 +2,27 @@
 
 namespace soft {
   namespace codegen {
+    /*
+     * Memory represents an allocated stack variable with his type
+     * and his stack offset.
+     * Register represents a physical register that has a type
+     * and a kind, the kind also is used to check whether the register
+     * is reserved or not in an array of pairs <Register::Knd, bool>.
+     */
     struct Memory {
       Type type;
       off_t offset;
     };
     struct Register {
       Type type;
-      size_t index;
-    };
-
-    struct GPR {
       enum class Knd : int {
         RAX = 0, RCX, RDX, RSI, RDI,
-        R8, R9, R10, R11
-      } knd;
-      bool reserved;
-    };
-    struct XMM {
-      enum class Knd : int {
-        XMM0 = 0, XMM1, XMM2, XMM3, XMM4, XMM5,
-        XMM6, XMM7, XMM8, XMM9, XMM10, XMM11,
+        R8, R9, R10, R11, XMM0 , XMM1,
+        XMM2, XMM3, XMM4, XMM5, XMM6,
+        XMM7, XMM8, XMM9, XMM10, XMM11,
         XMM12, XMM13, XMM14, XMM15
       } knd;
-      bool reserved;
     };
-
-    std::string gpr_by_size(const GPR::Knd& knd, size_t byte);
-    std::string xmm_by_size(const XMM::Knd& knd, size_t byte);
-    std::string resolve_constant(const ir::Constant& constant);
 
     void generate_terminator(const ir::Terminator& term);
     void generate_instruction(const ir::Instruction& instr);
