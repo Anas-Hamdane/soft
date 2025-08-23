@@ -360,15 +360,17 @@ namespace soft {
       Token token = expect(Token::Knd::DataType);
 
       Type type;
-      if (token.form.starts_with('i'))
-        type.knd = Type::Knd::Int;
-      else if (token.form.starts_with('u'))
-        type.knd = Type::Knd::UInt;
-      else
-        type.knd = Type::Knd::Float;
+      switch (token.form[0]) {
+        case 'u':
+          type.setSigned(false);
+        case 'i':
+          type.setKnd(Type::Knd::Integer);
+          break;
+        case 'f':
+          type.setKnd(Type::Knd::Float);
+      }
 
-      type.byte = generate_integer(token.form.substr(1));
-      type.byte /= 8; // to get the number of byte not bit
+      type.setBitwidth(generate_integer(token.form.substr(1)));
       return std::make_unique<Type>(type);
     }
     std::unique_ptr<Expr> generate_primary()
@@ -514,6 +516,10 @@ namespace soft {
       {
         advance();
         decl->type = generate_type();
+      }
+      else
+      {
+        decl->type = std::make_unique<Type>(Type::Knd::Void, 8);
       }
 
       if (match(Token::Knd::SemiColon))

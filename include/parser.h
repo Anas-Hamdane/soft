@@ -2,11 +2,7 @@
 
 #include "stl.h"
 #include "lexer.h"
-
-struct Type {
-  enum class Knd { Int, UInt, Float } knd;
-  size_t byte;
-};
+#include "data/Type.h"
 
 // the parser itself
 namespace soft {

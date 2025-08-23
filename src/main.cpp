@@ -3,8 +3,7 @@
 #include "file.h"
 #include "lexer.h"
 #include "parser.h"
-#include "ir.h"
-#include "codegen.h"
+#include "ir/ir.h"
 
 using namespace soft;
 
@@ -19,9 +18,9 @@ int main(int argc, char *argv[])
   std::vector<Token> tkns = lexer::lex(content);
 
   auto ast = ast::generate(tkns);
-  ir::Program program = ir::generate(ast);
+  Program program = ir::generate(ast, opts.program);
 
-  std::string code = codegen::generate(program);
-  std::print("{}", code);
+  // std::string code = codegen::generate(program);
+  // std::print("{}", code);
   return 0;
 }
