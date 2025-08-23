@@ -10,10 +10,123 @@ namespace soft {
     Program program;
     size_t id;
 
-    Value constant_folding(const Constant& a, BinOp::Op op, const Constant& b) {}
-    Value constant_cast(Constant& constant, const Type& type) {}
-    void cast(Value& value, const Type& type) {}
-    Value assign(Value value, Slot dst) {}
+    Value constant_folding(const Constant& a, BinOp::Op op, const Constant& b)
+    {
+      auto constant_double_value = [](const Constant& c) {
+        switch (c.getIndex()) {
+          case 0:  return (double) c.getValue<0>();
+          case 1:  return (double) c.getValue<1>();
+          default: unreachable();
+        }
+      };
+      auto constant_int64_value = [](const Constant& c) {
+        switch (c.getIndex()) {
+          case 0:  return (int64_t) c.getValue<0>();
+          case 1:  return (int64_t) c.getValue<1>();
+          default: unreachable();
+        }
+      };
+
+      auto calculate_double_constant = [](BinOp::Op op, double l, double r) {
+        switch (op) {
+          case BinOp::Op::Add: return l + r;
+          case BinOp::Op::Sub: return l - r;
+          case BinOp::Op::Mul: return l * r;
+          case BinOp::Op::Div: return l / r;
+          default:             unreachable();
+        }
+      };
+      auto calculate_int64_constant = [](BinOp::Op op, int64_t l, int64_t r) {
+        switch (op) {
+          case BinOp::Op::Add: return l + r;
+          case BinOp::Op::Sub: return l - r;
+          case BinOp::Op::Mul: return l * r;
+          case BinOp::Op::Div: return l / r;
+          default:             unreachable();
+        }
+      };
+
+      Constant result;
+      Type& type = result.getType();
+      type.setBitwidth(std::max(a.getType().getBitwidth(), b.getType().getBitwidth()));
+
+      if (a.getType().isFloatingPoint() || b.getType().isFloatingPoint())
+      {
+        double av = constant_double_value(a);
+        double bv = constant_double_value(b);
+
+        type.setKnd(Type::Knd::Float);
+        result.setValue<double>(calculate_double_constant(op, av, bv));
+      }
+      else
+      {
+        int64_t av = constant_int64_value(a);
+        int64_t bv = constant_int64_value(b);
+
+        type.setKnd(Type::Knd::Integer);
+        result.setValue(calculate_int64_constant(op, av, bv));
+      }
+
+      return Value(result);
+    }
+    void constant_cast(Constant& c, const Type& type)
+    {
+      // different bitwidths
+      if (!c.getType().cmpBitwidth(type.getBitwidth()))
+        c.getType().setBitwidth(type.getBitwidth());
+
+      // if it's just the bitwidth difference
+      // we don't need to cast anything
+      if (c.getType().cmpKnd(type.getKnd()))
+        return;
+
+      switch (c.getIndex())
+      {
+        case 0: // int64_t
+          // convert int to double
+          goto float_dst;
+          break;
+        case 1: // double
+          // convert double to int
+          c.setValue<int64_t>(c.getValue<1>());
+          break;
+      }
+
+      // casted successfully
+      c.getType().setKnd(type.getKnd());
+      return;
+
+float_dst:
+      todo();
+    }
+    void cast(Value& value, const Type& type)
+    {
+      // types are equal no need to cast
+      if (value.getType().cmpTo(type))
+        return;
+
+      if (value.isConstant())
+        return constant_cast(value.getValue<0>(), type);
+
+      Slot slot(type, id++);
+      current_function->addInstruction( Convert(value, slot) );
+      value.setValue<Slot>(slot);
+    }
+    Value assign(Value src, Slot dst)
+    {
+      cast(src, dst.getType());
+
+      // slots must be loaded
+      if (src.isSlot())
+      {
+        Slot slot = { dst.getType(), id++ };
+        current_function->addInstruction( Load(src, slot) );
+        src.setValue<Slot>(slot);
+      }
+
+      current_function->addInstruction( Store(src, dst) );
+      return src;
+    }
     Value generate_expr(const std::unique_ptr<ast::Expr>& expr)
     {
       switch (expr->index())
@@ -200,7 +313,7 @@ namespace soft {
       }
 
       // for now
-      if (!current_function->getType().isVoid())
+      if (current_function->getType().isVoid())
       {
         std::println(stderr, "`return` statement inside a void function is not allowed");
         exit(1);
