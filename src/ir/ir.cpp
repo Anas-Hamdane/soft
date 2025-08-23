@@ -386,6 +386,7 @@ float_dst:
       for (auto& stmt : stmt->body)
         generate_stmt(stmt);    
 
+      fn.setTotalRegisters(id);
       program.addFunction(fn);
       fns_table[fn.getName()] = &program.getFunctions().back();
     }

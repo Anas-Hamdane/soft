@@ -19,7 +19,6 @@ namespace soft {
   Function::Function() = default;
 
   bool Function::isDefined() const { return defined; }
-  bool Function::isDeclared() const { return !defined; }
   bool Function::isTerminated() const { return this->terminator.has_value(); }
 
   std::string& Function::getName() { return this->name; }
@@ -41,7 +40,7 @@ namespace soft {
   void Function::setParams(std::vector<Slot> params)    { this->params = std::move(params); }
   void Function::setBody(std::vector<Instruction> body) { this->body = std::move(body); }
   void Function::setDefined(bool defined)               { this->defined = defined; }
-  void Function::setTotalRegister(size_t total_registers) { this->total_registers = total_registers; }
+  void Function::setTotalRegisters(size_t total_registers) { this->total_registers = total_registers; }
 
   void Function::addParam(Slot param) { this->params.push_back(std::move(param)); }
   void Function::addInstruction(Instruction instruction) { this->body.push_back(std::move(instruction)); }

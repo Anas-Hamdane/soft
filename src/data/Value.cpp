@@ -16,10 +16,9 @@ namespace soft {
 
     switch (this->value.index())
     {
-      case 0:
-        this->type = &std::get<0>(this->value).getType();
-      case 1:
-        this->type = &std::get<1>(this->value).getType();
+      case 0: this->type = &std::get<0>(this->value).getType(); break;
+      case 1: this->type = &std::get<1>(this->value).getType(); break;
+      default: unreachable();
     }
 
     return *this->type;

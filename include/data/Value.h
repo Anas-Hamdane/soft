@@ -33,7 +33,7 @@ namespace soft {
       void setValue(T value) { this->value = std::move(value); }
 
     private:
-      Type* type;
       std::variant<Constant, Slot> value;
+      Type* type = nullptr;
   };
 }

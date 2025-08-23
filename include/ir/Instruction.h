@@ -1,3 +1,5 @@
+#pragma once
+
 #include "data/Value.h"
 
 namespace soft {

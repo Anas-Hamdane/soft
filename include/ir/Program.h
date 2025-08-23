@@ -1,3 +1,5 @@
+#pragma once
+
 #include "stl.h"
 #include "data/Value.h"
 #include "Instruction.h"
@@ -27,7 +29,6 @@ namespace soft {
       Function();
 
       bool isDefined() const;
-      bool isDeclared() const;
       bool isTerminated() const;
 
       std::string& getName();
@@ -49,7 +50,7 @@ namespace soft {
       void setParams(std::vector<Slot> params);
       void setBody(std::vector<Instruction> body);
       void setDefined(bool defined);
-      void setTotalRegister(size_t total_registers);
+      void setTotalRegisters(size_t total_registers);
 
       void addParam(Slot param);
       void addInstruction(Instruction instruction);
