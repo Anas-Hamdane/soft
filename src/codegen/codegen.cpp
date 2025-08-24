@@ -98,6 +98,42 @@ namespace soft {
       return Storage( Memory(type, offset) );
     }
 
+    void generate_instruction(const Instruction& instruction)
+    {
+      switch (instruction.index())
+      {
+        case 0: // Alloca
+        {
+          auto& alloca = std::get<0>(instruction);
+          offset += alloca.getType().getByteSize();
+
+          Memory mem(alloca.getType(), offset);
+          storage[alloca.getDst().getId()].setValue<Memory>(mem);
+
+          return;
+        }
+        case 1: // Store
+        {
+
+        }
+        case 2: // Load
+        {
+
+        }
+        case 3: // Convert
+        {
+
+        }
+        case 4: // BinOp
+        {
+
+        }
+        case 5: // UnOp
+        {
+
+        }
+      }
+    }
     void generate_params(const std::vector<Slot>& params)
     {
       static constexpr std::array<std::string_view, 6> integer_regs = {
@@ -163,6 +199,11 @@ namespace soft {
       offset = 0;
 
       generate_params(fn.getParams());
+
+      const auto& body = fn.getBody();
+      for (const auto& instruction : body)
+        generate_instruction(instruction);
+
     }
     std::string generate(const Program& program)
     {
