@@ -44,6 +44,25 @@ namespace soft {
     std::string out;
     size_t offset;
 
+    void deallocate(const Register& register_v)
+    {
+      pool[static_cast<int>(register_v.getKnd())].second = false;
+    }
+    void deallocate(const Slot& slot)
+    {
+      const auto& stored = storage[slot.getId()];
+      if (stored.isRegister())
+      {
+        return deallocate(stored.getValue<1>());
+      }
+    }
+    void deallocate(const Value& value)
+    {
+      if (value.isSlot())
+      {
+        return deallocate(value.getValue<1>());
+      }
+    }
     char suffix(const Type& type)
     {
       if (type.isFloatingPoint())
@@ -66,7 +85,7 @@ namespace soft {
       }
       unreachable();
     }
-    std::string mov_form(const Type& type)
+    std::string form(const Type& type)
     {
       std::string mov = "mov";
       if (type.isFloatingPoint())
@@ -74,6 +93,28 @@ namespace soft {
 
       mov += suffix(type);
       return mov;
+    }
+    std::string form(const Constant& constant)
+    {
+      switch (constant.getIndex())
+      {
+        case 0: // int64_t
+          return std::format("${}", constant.getValue<0>());
+        case 1: // double
+          todo();
+      }
+      unreachable();
+    }
+    std::string form(const Value& value)
+    {
+      switch (value.getIndex())
+      {
+        case 0: // Constant
+          return form(value.getValue<0>());
+        case 1: // Slot
+          return storage[value.getValue<1>().getId()].toString();
+      }
+      unreachable();
     }
     Storage make_temp(const Type& type)
     {
@@ -92,7 +133,30 @@ namespace soft {
         }
       }
 
-      // if there's no free register
+      // if there's no free registers
+      // fallback to memory
+      offset += type.getByteSize();
+      return Storage( Memory(type, offset) );
+    }
+    Storage allocate_register(const Type& type)
+    {
+      static constexpr size_t integer_register_size = 9;
+      static constexpr size_t float_register_size = 15;
+
+      assert(!type.isVoid());
+      size_t start = type.isFloatingPoint() ? integer_register_size : 0;
+      size_t end = type.isFloatingPoint() ? float_register_size : integer_register_size;
+
+      for (size_t i = start; i < end; ++i)
+      {
+        if (!pool[i].second) // not reserved
+        {
+          pool[i].second = true;
+          return Storage( Register(type, pool[i].first) );
+        }
+      }
+
+      // if there's no free registers
       // fallback to memory
       offset += type.getByteSize();
       return Storage( Memory(type, offset) );
@@ -114,23 +178,41 @@ namespace soft {
         }
         case 1: // Store
         {
+          auto& store = std::get<1>(instruction);
 
+          std::string mov = form(store.getDst().getType());
+          std::string src = form(store.getSrc());
+          std::string dst = storage[store.getDst().getId()].toString();
+
+          append("  {} {}, {}", mov, src, dst);
+          deallocate(store.getSrc());
+          return;
         }
         case 2: // Load
         {
+          auto& load = std::get<2>(instruction);
+          const auto& type = load.getDst().getType();
+          Storage reg = allocate_register(load.getDst().getType());
 
+          std::string mov = form(type);
+          std::string src = form(load.getSrc());
+          std::string dst = reg.toString();
+
+          append("  {} {}, {}", mov, src, dst);
+          storage[load.getDst().getId()] = reg;
+          return;
         }
         case 3: // Convert
         {
-
+          todo();
         }
         case 4: // BinOp
         {
-
+          todo();
         }
         case 5: // UnOp
         {
-
+          todo();
         }
       }
     }
@@ -149,7 +231,7 @@ namespace soft {
 
       for (const auto& param : params)
       {
-        const std::string mov = mov_form(param.getType());
+        const std::string mov = form(param.getType());
 
         // the destination
         offset += param.getType().getByteSize();
