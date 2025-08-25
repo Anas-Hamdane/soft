@@ -61,14 +61,18 @@ namespace soft {
       unreachable();
     }
 
-    Storage::Storage(std::variant<Memory, Register> value)
+    Storage::Storage(Memory value)
+      : value(std::move(value)) {}
+    Storage::Storage(Register value)
       : value(std::move(value)) {}
     Storage::Storage() = default;
 
     bool Storage::isMemory() const { return getIndex() == 0; }
     bool Storage::isRegister() const { return getIndex() == 1; }
-
     size_t Storage::getIndex() const { return this->value.index(); }
+
+    Memory& Storage::getMemory() { return std::get<0>(this->value); }
+    Register& Storage::getRegister() { return std::get<1>(this->value); }
     Type& Storage::getType()
     {
       if (this->type)
@@ -83,6 +87,9 @@ namespace soft {
 
       return *this->type;
     }
+
+    const Memory& Storage::getMemory() const { return std::get<0>(this->value); }
+    const Register& Storage::getRegister() const { return std::get<1>(this->value); }
     const Type& Storage::getType() const
     {
       if (this->type)
@@ -98,12 +105,8 @@ namespace soft {
 
     std::string Storage::toString()
     {
-      switch (getIndex())
-      {
-        case 0: return this->getValue<0>().toString();
-        case 1: return this->getValue<1>().toString();
-      }
-      unreachable();
+      if (isRegister()) return this->getMemory().toString();
+      else return this->getRegister().toString();
     }
   }
 }

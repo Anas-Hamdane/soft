@@ -52,27 +52,27 @@ namespace soft {
     };
     class Storage {
       public:
-        Storage(std::variant<Memory, Register> value);
+        Storage(Memory value);
+        Storage(Register value);
         Storage();
 
         bool isMemory() const;
         bool isRegister() const;
-
+        // Returns:
+        //   0: if the value inside is of type `Memory`
+        //   1: if the value inside is of type `Register`
         size_t getIndex() const;
-        template<size_t idx>
-        requires(idx == 0 || idx == 1)
-        auto& getValue() { return std::get<idx>(value); }
 
-        template<size_t idx>
-        requires(idx == 0 || idx == 1)
-        const auto& getValue() const { return std::get<idx>(value); }
-
+        Memory& getMemory();
+        Register& getRegister();
         Type& getType();
+
+        const Memory& getMemory() const;
+        const Register& getRegister() const;
         const Type& getType() const;
 
-        template<typename T>
-        requires(std::same_as<T, Memory> || std::same_as<T, Register>)
-        void setValue(T value) { this->value = std::move(value); }
+        void setValue(Memory value);
+        void setValue(Register value);
 
         std::string toString();
 
