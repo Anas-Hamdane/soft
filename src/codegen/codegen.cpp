@@ -85,6 +85,8 @@ namespace soft {
       }
       unreachable();
     }
+
+    // to string functions
     std::string movts(const Type& type)
     {
       std::string mov = "mov";
@@ -112,6 +114,7 @@ namespace soft {
 
       unreachable();
     }
+
     Storage make_temp(const Type& type)
     {
       static constexpr size_t integer_register_size = 9;
@@ -177,13 +180,82 @@ namespace soft {
       stored.setValue(reg);
     }
 
-    void generate_instruction(const Instruction& instruction)
+    void int2int_cast(Value& src, Slot& dst)
+    {
+      Type& sty = src.getType(); // src type
+      Type& dty = dst.getType(); // dst type
+
+      if (!sty.isInteger() || !dty.isInteger())
+        return;
+
+      if (dty.cmpTo(sty))
+        return;
+
+      // we don't need to do anything since they are both integers
+      // and the only difference will be the bitwidth (size).
+      if (src.isConstant())
+      {
+        src.getConstant().getType().setBitwidth(dty.getBitwidth());
+        return;
+      }
+
+      // the source storage
+      // WARN: we assume there's only a `Constant` and a `Slot`
+      // possibilities for the `Value`
+      Storage& ss = storage[src.getSlot().getId()];
+
+      // in this case if the src is a variable in `Memory` we should load
+      // it into a register of the same size(bitwidth) and change the bitwidth
+      // of the `dst` to match the given destination type bitwidth, so it will
+      // be used in the next instruction with that new size
+      if (sty.getBitwidth() > dty.getBitwidth())
+      {
+        Storage ds;
+        if (ss.isMemory())
+        {
+          ds = allocate_register(sty);
+          append("  {} {}, {}", movts(sty), ss.toString(), ds.toString());
+        }
+        else // if (ss.isRegister())
+        {
+          ds = ss;
+        }
+
+        ds.getType().setBitwidth(dty.getBitwidth());
+        storage[dst.getId()] = ds;
+      }
+      else
+      {
+        // mov[s|z][x][x]
+        std::string mov = "mov";
+        if (ss.getType().isSigned()) mov += 's';
+        else mov += 'z';
+        mov += suffix(sty);
+        mov += suffix(dty);
+
+        Storage ds;
+        if (ss.isMemory())
+        {
+          ds = allocate_register(dty);
+          append("  {} {}, {}", mov, ss.toString(), ds.toString());
+        }
+        else // if (ss.isRegister())
+        {
+          ds = ss;
+          ds.getType().setBitwidth(dty.getBitwidth());
+          append("  {} {}, {}", mov, ss.toString(), ds.toString());
+        }
+
+        storage[dst.getId()] = ds;
+      }
+    }
+    void generate_instruction(Instruction& instruction)
     {
       switch (instruction.index())
       {
         case 0: // Alloca
         {
-          auto& alloca = std::get<0>(instruction);
+          const auto& alloca = std::get<0>(instruction);
           offset += alloca.getType().getByteSize();
 
           Memory mem(alloca.getType(), offset);
@@ -193,7 +265,7 @@ namespace soft {
         }
         case 1: // Store
         {
-          auto& store = std::get<1>(instruction);
+          const auto& store = std::get<1>(instruction);
           auto value = store.getSrc();
 
           // loads ONLY if we need to
@@ -210,46 +282,14 @@ namespace soft {
         case 2: // Convert
         {
           auto& convert = std::get<2>(instruction);
-          const Type& srct = convert.getSrc().getType();
-          const Type& dstt = convert.getDst().getType();
+          const Type& sty = convert.getSrc().getType();
+          const Type& dty = convert.getDst().getType();
 
           // int to int
-          if (srct.isInteger() && dstt.isInteger())
-          {
-            if (srct.getByteSize() == dstt.getByteSize())
-              return;
-
-            if (srct.getByteSize() > dstt.getByteSize())
-            {
-              assert(convert.getSrc().isSlot());
-              Storage src_storage = storage[convert.getSrc().getSlot().getId()];
-
-              if (src_storage.isMemory())
-              {
-                Storage dst_storage = allocate_register(srct);
-                std::string mov = movts(srct);
-                append("  {} {}, {}", mov, src_storage.toString(), dst_storage.toString());
-                dst_storage.getType().setBitwidth(dstt.getBitwidth());
-
-                storage[convert.getDst().getId()] = dst_storage;
-                return;
-              }
-              else if (src_storage.isRegister())
-              {
-                Storage dst_storage = src_storage;
-                dst_storage.getType().setBitwidth(srct.getBitwidth());
-
-                storage[convert.getDst().getId()] = dst_storage;
-                return;
-              }
-
-              unreachable();
-            }
-            else
-            {
-
-            }
-          }
+          if (sty.isInteger() && dty.isInteger())
+            return int2int_cast(convert.getSrc(), convert.getDst());
+          else
+            unreachable();
         }
         case 3: // BinOp
         {
@@ -306,7 +346,7 @@ namespace soft {
         storage[param.getId()].setValue(mem);
       }
     }
-    void generate_function(const Function& fn)
+    void generate_function(Function& fn)
     {
       if (!fn.isDefined())
         return; // do nothing
@@ -328,18 +368,18 @@ namespace soft {
 
       generate_params(fn.getParams());
 
-      const auto& body = fn.getBody();
-      for (const auto& instruction : body)
+      auto& body = fn.getBody();
+      for (auto& instruction : body)
         generate_instruction(instruction);
 
     }
-    std::string generate(const Program& program)
+    std::string generate(Program& program)
     {
       append("# Program: {}", program.getName());
       append(".section .text\n");
 
-      const auto& functions = program.getFunctions();
-      for (const auto& fn : functions)
+      auto& functions = program.getFunctions();
+      for (auto& fn : functions)
         generate_function(fn);
 
       return out;

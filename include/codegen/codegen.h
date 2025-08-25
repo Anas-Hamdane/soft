@@ -4,6 +4,6 @@
 
 namespace soft {
   namespace codegen {
-    std::string generate(const Program& program);
+    std::string generate(Program& program);
   }
 }
