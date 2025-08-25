@@ -37,23 +37,6 @@ namespace soft {
       Value src;
       Slot dst;
   };
-  class Load {
-    public:
-      Load(Value src, Slot dst);
-
-      Value& getSrc();
-      Slot& getDst();
-
-      const Value& getSrc() const;
-      const Slot& getDst() const;
-
-      void setSrc(Value src);
-      void setDst(Slot dst);
-
-    private:
-      Value src;
-      Slot dst;
-  };
   class Convert {
     public:
       Convert(Value src, Slot dst);
@@ -118,5 +101,5 @@ namespace soft {
       Slot dst;
       Op op;
   };
-  using Instruction = std::variant<Alloca, Store, Load, Convert, BinOp, UnOp>;
+  using Instruction = std::variant<Alloca, Store, Convert, BinOp, UnOp>;
 }

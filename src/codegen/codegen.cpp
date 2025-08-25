@@ -9,8 +9,8 @@ namespace soft {
   namespace codegen {
     // to track reserved and unreserved registers
     // NOTE: the order is crucial since we access them by
-    // the value of Type::Knd enum which is equal to the index
-    // of the value in this array.
+    // the int value of the enum class Type::Knd which is equal
+    // to the index of it's value in this array.
     std::array<std::pair<Register::Knd, bool>, 25> pool = {{
       {Register::Knd::RAX  , false},
       {Register::Knd::RCX  , false},
@@ -53,14 +53,14 @@ namespace soft {
       const auto& stored = storage[slot.getId()];
       if (stored.isRegister())
       {
-        return deallocate(stored.getValue<1>());
+        return deallocate(stored.getRegister());
       }
     }
     void deallocate(const Value& value)
     {
       if (value.isSlot())
       {
-        return deallocate(value.getValue<1>());
+        return deallocate(value.getSlot());
       }
     }
     char suffix(const Type& type)
@@ -85,7 +85,7 @@ namespace soft {
       }
       unreachable();
     }
-    std::string form(const Type& type)
+    std::string movts(const Type& type)
     {
       std::string mov = "mov";
       if (type.isFloatingPoint())
@@ -94,26 +94,22 @@ namespace soft {
       mov += suffix(type);
       return mov;
     }
-    std::string form(const Constant& constant)
+    std::string constantts(const Constant& constant)
     {
-      switch (constant.getIndex())
-      {
-        case 0: // int64_t
-          return std::format("${}", constant.getValue<0>());
-        case 1: // double
-          todo();
-      }
+      if (constant.isIntegerValue())
+        return std::format("${}", constant.getIntegerValue());
+      else if (constant.isFloatValue())
+        todo();
+
       unreachable();
     }
-    std::string form(const Value& value)
+    std::string valuets(const Value& value)
     {
-      switch (value.getIndex())
-      {
-        case 0: // Constant
-          return form(value.getValue<0>());
-        case 1: // Slot
-          return storage[value.getValue<1>().getId()].toString();
-      }
+      if (value.isConstant())
+        return constantts(value.getConstant());
+      else if (value.isSlot())
+        return storage[value.getSlot().getId()].toString();
+
       unreachable();
     }
     Storage make_temp(const Type& type)
@@ -138,7 +134,7 @@ namespace soft {
       offset += type.getByteSize();
       return Storage( Memory(type, offset) );
     }
-    Storage allocate_register(const Type& type)
+    Register allocate_register(const Type& type)
     {
       static constexpr size_t integer_register_size = 9;
       static constexpr size_t float_register_size = 15;
@@ -152,14 +148,33 @@ namespace soft {
         if (!pool[i].second) // not reserved
         {
           pool[i].second = true;
-          return Storage( Register(type, pool[i].first) );
+          return Register(type, pool[i].first);
         }
       }
 
-      // if there's no free registers
-      // fallback to memory
-      offset += type.getByteSize();
-      return Storage( Memory(type, offset) );
+      // I don't know
+      todo();
+    }
+    void load(Value& value)
+    {
+      // constant doesn't need to be loaded
+      if (!value.isSlot())
+        return;
+
+      Slot& slot = value.getSlot();
+      Storage& stored = storage[slot.getId()];
+
+      // registers doesn't need to be loaded
+      if (!stored.isMemory())
+        return;
+
+      const Memory& mem = stored.getMemory();
+      Register reg = allocate_register(mem.getType());
+      std::string mov = movts(mem.getType());
+      append("  {} {}, {}", mov, mem.toString(), reg.toString());
+
+      // note that it is a reference
+      stored.setValue(reg);
     }
 
     void generate_instruction(const Instruction& instruction)
@@ -172,49 +187,80 @@ namespace soft {
           offset += alloca.getType().getByteSize();
 
           Memory mem(alloca.getType(), offset);
-          storage[alloca.getDst().getId()].setValue<Memory>(mem);
+          storage[alloca.getDst().getId()].setValue(mem);
 
           return;
         }
         case 1: // Store
         {
           auto& store = std::get<1>(instruction);
+          auto value = store.getSrc();
 
-          std::string mov = form(store.getDst().getType());
-          std::string src = form(store.getSrc());
+          // loads ONLY if we need to
+          load(value);
+
+          std::string mov = movts(store.getDst().getType());
+          std::string src = valuets(store.getSrc());
           std::string dst = storage[store.getDst().getId()].toString();
 
           append("  {} {}, {}", mov, src, dst);
           deallocate(store.getSrc());
           return;
         }
-        case 2: // Load
+        case 2: // Convert
         {
-          auto& load = std::get<2>(instruction);
-          const auto& type = load.getDst().getType();
-          Storage reg = allocate_register(load.getDst().getType());
+          auto& convert = std::get<2>(instruction);
+          const Type& srct = convert.getSrc().getType();
+          const Type& dstt = convert.getDst().getType();
 
-          std::string mov = form(type);
-          std::string src = form(load.getSrc());
-          std::string dst = reg.toString();
+          // int to int
+          if (srct.isInteger() && dstt.isInteger())
+          {
+            if (srct.getByteSize() == dstt.getByteSize())
+              return;
 
-          append("  {} {}, {}", mov, src, dst);
-          storage[load.getDst().getId()] = reg;
-          return;
+            if (srct.getByteSize() > dstt.getByteSize())
+            {
+              assert(convert.getSrc().isSlot());
+              Storage src_storage = storage[convert.getSrc().getSlot().getId()];
+
+              if (src_storage.isMemory())
+              {
+                Storage dst_storage = allocate_register(srct);
+                std::string mov = movts(srct);
+                append("  {} {}, {}", mov, src_storage.toString(), dst_storage.toString());
+                dst_storage.getType().setBitwidth(dstt.getBitwidth());
+
+                storage[convert.getDst().getId()] = dst_storage;
+                return;
+              }
+              else if (src_storage.isRegister())
+              {
+                Storage dst_storage = src_storage;
+                dst_storage.getType().setBitwidth(srct.getBitwidth());
+
+                storage[convert.getDst().getId()] = dst_storage;
+                return;
+              }
+
+              unreachable();
+            }
+            else
+            {
+
+            }
+          }
         }
-        case 3: // Convert
+        case 3: // BinOp
         {
           todo();
         }
-        case 4: // BinOp
-        {
-          todo();
-        }
-        case 5: // UnOp
+        case 4: // UnOp
         {
           todo();
         }
       }
+      unreachable();
     }
     void generate_params(const std::vector<Slot>& params)
     {
@@ -231,7 +277,7 @@ namespace soft {
 
       for (const auto& param : params)
       {
-        const std::string mov = form(param.getType());
+        const std::string mov = movts(param.getType());
 
         // the destination
         offset += param.getType().getByteSize();
@@ -257,7 +303,7 @@ namespace soft {
           stack_params_offset += param.getType().getByteSize();
         }
 
-        storage[param.getId()].setValue<Memory>(mem);
+        storage[param.getId()].setValue(mem);
       }
     }
     void generate_function(const Function& fn)

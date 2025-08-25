@@ -12,22 +12,21 @@ namespace soft {
 
     Value constant_folding(const Constant& a, BinOp::Op op, const Constant& b)
     {
-      auto constant_double_value = [](const Constant& c) {
-        switch (c.getIndex()) {
-          case 0:  return (double) c.getValue<0>();
-          case 1:  return (double) c.getValue<1>();
-          default: unreachable();
-        }
+      auto constant_double_value = [](const Constant& c)
+      {
+        if (c.isIntegerValue()) return (double) c.getIntegerValue();
+        else if (c.isFloatValue()) return c.getFloatValue();
+        unreachable();
       };
-      auto constant_int64_value = [](const Constant& c) {
-        switch (c.getIndex()) {
-          case 0:  return (int64_t) c.getValue<0>();
-          case 1:  return (int64_t) c.getValue<1>();
-          default: unreachable();
-        }
+      auto constant_int64_value = [](const Constant& c)
+      {
+        if (c.isFloatValue()) return (int64_t) c.getFloatValue();
+        else if (c.isIntegerValue()) return c.getIntegerValue();
+        unreachable();
       };
 
-      auto calculate_double_constant = [](BinOp::Op op, double l, double r) {
+      auto calculate_double_constant = [](BinOp::Op op, double l, double r)
+      {
         switch (op) {
           case BinOp::Op::Add: return l + r;
           case BinOp::Op::Sub: return l - r;
@@ -36,7 +35,8 @@ namespace soft {
           default:             unreachable();
         }
       };
-      auto calculate_int64_constant = [](BinOp::Op op, int64_t l, int64_t r) {
+      auto calculate_int64_constant = [](BinOp::Op op, int64_t l, int64_t r)
+      {
         switch (op) {
           case BinOp::Op::Add: return l + r;
           case BinOp::Op::Sub: return l - r;
@@ -56,7 +56,7 @@ namespace soft {
         double bv = constant_double_value(b);
 
         type.setKnd(Type::Knd::Float);
-        result.setValue<double>(calculate_double_constant(op, av, bv));
+        result.setValue(calculate_double_constant(op, av, bv));
       }
       else
       {
@@ -80,17 +80,9 @@ namespace soft {
       if (c.getType().cmpKnd(type.getKnd()))
         return;
 
-      switch (c.getIndex())
-      {
-        case 0: // int64_t
-          // convert int to double
-          goto float_dst;
-          break;
-        case 1: // double
-          // convert double to int
-          c.setValue<int64_t>(c.getValue<1>());
-          break;
-      }
+      if (c.isIntegerValue()) goto float_dst;
+      else if (c.isFloatValue()) c.setValue((int64_t) c.getFloatValue());
+      else unreachable();
 
       // casted successfully
       c.getType().setKnd(type.getKnd());
@@ -106,24 +98,15 @@ float_dst:
         return;
 
       if (value.isConstant())
-        return constant_cast(value.getValue<0>(), type);
+        return constant_cast(value.getConstant(), type);
 
       Slot slot(type, id++);
       current_function->addInstruction( Convert(value, slot) );
-      value.setValue<Slot>(slot);
+      value.setValue(slot);
     }
     Value assign(Value src, Slot dst)
     {
       cast(src, dst.getType());
-
-      // slots must be loaded
-      if (src.isSlot())
-      {
-        Slot slot = { dst.getType(), id++ };
-        current_function->addInstruction( Load(src, slot) );
-        src.setValue<Slot>(slot);
-      }
-
       current_function->addInstruction( Store(src, dst) );
       return src;
     }
@@ -135,7 +118,7 @@ float_dst:
         {
           auto& lit = std::get<0>(*expr);
           Constant constant;
-          constant.setValue<int64_t>(lit->v);
+          constant.setValue((int64_t) lit->v);
           constant.getType().setKnd(Type::Knd::Integer);
 
           // if the value is bigger than LONG_MAX_VAL
@@ -152,7 +135,7 @@ float_dst:
         {
           auto& lit = std::get<1>(*expr);
           Constant constant;
-          constant.setValue<double>(lit->v);
+          constant.setValue((double) lit->v);
           constant.getType().setKnd(Type::Knd::Float);
 
           // if the value is bigger than LONG_MAX_VAL
@@ -244,7 +227,7 @@ float_dst:
             exit(1);
           }
 
-          return assign(src, dst.getValue<1>());
+          return assign(src, dst.getSlot());
         }
         case 9: // BinOp
         {
@@ -263,7 +246,7 @@ float_dst:
           }
           
           if (lhs.isConstant() && rhs.isConstant())
-            return constant_folding(lhs.getValue<0>(), op, rhs.getValue<0>());
+            return constant_folding(lhs.getConstant(), op, rhs.getConstant());
 
           Type lt = lhs.getType();
           Type rt = rhs.getType();

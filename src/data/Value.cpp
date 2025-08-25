@@ -16,30 +16,17 @@ namespace soft {
   Slot& Value::getSlot() { return std::get<1>(this->value); }
   Type& Value::getType()
   {
-    if (this->type)
-      return *this->type;
+    if (isConstant()) return getConstant().getType();
+    else if (isSlot()) return getSlot().getType();
 
-    switch (this->value.index())
-    {
-      case 0: this->type = &std::get<0>(this->value).getType(); break;
-      case 1: this->type = &std::get<1>(this->value).getType(); break;
-      default: unreachable();
-    }
-
-    return *this->type;
+    unreachable();
   }
   const Constant& Value::getConstant() const { return std::get<0>(this->value); }
   const Slot& Value::getSlot() const { return std::get<1>(this->value); }
   const Type& Value::getType() const
   {
-    if (this->type)
-      return *this->type;
-
-    switch (this->value.index())
-    {
-      case 0: return std::get<0>(this->value).getType();
-      case 1: return std::get<1>(this->value).getType();
-    }
+    if (isConstant()) return getConstant().getType();
+    else if (isSlot()) return getSlot().getType();
 
     unreachable();
   }

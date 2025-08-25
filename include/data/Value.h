@@ -20,6 +20,7 @@ namespace soft {
       Constant& getConstant();
       Slot& getSlot();
       Type& getType();
+
       const Constant& getConstant() const;
       const Slot& getSlot() const;
       const Type& getType() const;
@@ -29,6 +30,5 @@ namespace soft {
 
     private:
       std::variant<Constant, Slot> value;
-      Type* type = nullptr;
   };
 }

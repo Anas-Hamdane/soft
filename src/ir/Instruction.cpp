@@ -25,18 +25,6 @@ namespace soft {
   void Store::setSrc(Value src) { this->src = std::move(src); }
   void Store::setDst(Slot dst) { this->dst = std::move(dst); }
 
-  Load::Load(Value src, Slot dst)
-    : src(std::move(src)), dst(std::move(dst)) {}
-
-  Value& Load::getSrc() { return this->src; }
-  Slot& Load::getDst() { return this->dst; }
-
-  const Value& Load::getSrc() const { return this->src; }
-  const Slot& Load::getDst() const { return this->dst; }
-
-  void Load::setSrc(Value src) { this->src = std::move(src); }
-  void Load::setDst(Slot dst) { this->dst = std::move(dst); }
-
   Convert::Convert(Value src, Slot dst)
     : src(std::move(src)), dst(std::move(dst)) {}
 

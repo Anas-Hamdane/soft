@@ -18,7 +18,7 @@ namespace soft {
         void setType(Type type);
         void setOffset(size_t offset);
 
-        std::string toString();
+        std::string toString() const;
 
       private:
         Type type;
@@ -44,7 +44,7 @@ namespace soft {
         void setType(Type type);
         void setKnd(Knd knd);
 
-        std::string toString();
+        std::string toString() const;
 
       private:
         Type type;
@@ -74,11 +74,10 @@ namespace soft {
         void setValue(Memory value);
         void setValue(Register value);
 
-        std::string toString();
+        std::string toString() const;
 
       private:
         std::variant<Memory, Register> value;
-        Type* type = nullptr;
     };
   }
 }

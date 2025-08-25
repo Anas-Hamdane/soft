@@ -14,7 +14,7 @@ namespace soft {
     void Memory::setType(Type type) { this->type = std::move(type); }
     void Memory::setOffset(size_t offset) { this->offset = offset; }
 
-    std::string Memory::toString() { return std::format("-{}(%rbp)", this->offset);}
+    std::string Memory::toString() const { return std::format("-{}(%rbp)", this->offset);}
 
     Register::Register(Type type, Knd knd)
       : type(std::move(type)), knd(knd) {}
@@ -27,7 +27,7 @@ namespace soft {
     void Register::setType(Type type) { this->type = std::move(type); }
     void Register::setKnd(Knd knd) { this->knd = knd; }
 
-    std::string Register::toString() 
+    std::string Register::toString() const 
     {
       static constexpr std::array<std::string, 9> gpr64 = {
         "rax", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11"
@@ -75,38 +75,29 @@ namespace soft {
     Register& Storage::getRegister() { return std::get<1>(this->value); }
     Type& Storage::getType()
     {
-      if (this->type)
-        return *this->type;
+      if (isMemory()) return getMemory().getType();
+      else if (isRegister()) return getRegister().getType();
 
-      switch (this->value.index())
-      {
-        case 0: this->type = &std::get<0>(this->value).getType(); break;
-        case 1: this->type = &std::get<1>(this->value).getType(); break;
-        default: unreachable();
-      }
-
-      return *this->type;
+      unreachable();
     }
 
     const Memory& Storage::getMemory() const { return std::get<0>(this->value); }
     const Register& Storage::getRegister() const { return std::get<1>(this->value); }
     const Type& Storage::getType() const
     {
-      if (this->type)
-        return *this->type;
+      if (isMemory()) return getMemory().getType();
+      else if (isRegister()) return getRegister().getType();
 
-      switch (this->value.index())
-      {
-        case 0: return std::get<0>(this->value).getType();
-        case 1: return std::get<1>(this->value).getType();
-      }
       unreachable();
     }
 
-    std::string Storage::toString()
+    void Storage::setValue(Memory value) { this->value = std::move(value); }
+    void Storage::setValue(Register value) { this->value = std::move(value); }
+
+    std::string Storage::toString() const
     {
-      if (isRegister()) return this->getMemory().toString();
-      else return this->getRegister().toString();
+      if (isRegister()) return this->getRegister().toString();
+      else return this->getMemory().toString();
     }
   }
 }
