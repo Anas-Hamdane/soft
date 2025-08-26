@@ -199,7 +199,7 @@ namespace soft {
 
     // NOTE: `Constant` source values are not allowed and should
     // be handled in the IR phase
-    void int2int_cast(Slot& src, Slot& dst)
+    void int2int(Slot& src, Slot& dst)
     {
       Type& sty = src.getType(); // src type
       Type& dty = dst.getType(); // dst type
@@ -278,7 +278,7 @@ namespace soft {
         Slot tmp_dst = dst;
         tmp_dst.setType(sty);
 
-        int2int_cast(src, tmp_dst);
+        int2int(src, tmp_dst);
         src = tmp_dst;
       }
 
@@ -288,6 +288,30 @@ namespace soft {
       Storage ds = allocate_register(dty); // destination storage
       Storage ss = storage[src.getId()]; // src storage
       appendln("  {} {}, {}", cvt, ss.toString(), ds.toString());
+
+      storage[dst.getId()] = ds;
+    }
+    void float2int(Slot& src, Slot& dst)
+    {
+      Type& sty = src.getType();
+      Type& dty = dst.getType();
+
+      if (!sty.isFloatingPoint() || !dty.isInteger())
+        return;
+
+      size_t original_bitwidth = dty.getBitwidth();
+      if (dty.getBitwidth() < 32) // min
+        dty.setBitwidth(32);
+
+      Storage ss = storage[src.getId()]; // src storage
+      Storage ds = allocate_register(dty); // dst storage
+
+      std::string cvt = std::format("cvts{}2si", suffix(sty));
+      appendln("  {} {}, {}", cvt, ss.toString(), ds.toString());
+
+      // restore original size
+      if (dty.getBitwidth() != original_bitwidth)
+        dty.setBitwidth(32);
 
       storage[dst.getId()] = ds;
     }
@@ -363,11 +387,13 @@ namespace soft {
 
           // int to int
           if (sty.isInteger() && dty.isInteger())
-            return int2int_cast(src, dst);
+            return int2int(src, dst);
           else if (sty.isInteger() && dty.isFloatingPoint())
             return int2float(src, dst);
+          else if (sty.isFloatingPoint() && dty.isInteger())
+            return float2int(src, dst);
           else
-            unreachable();
+            todo();
         }
         case 3: // BinOp
         {
