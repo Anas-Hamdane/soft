@@ -81,7 +81,7 @@ namespace soft {
     DataLabel floating_point_label(const Constant& constant)
     {
       // float
-      if (constant.getType().getBitwidth() == 32)
+      if (constant.getType().isFloatingPoint(32))
       {
         float value = (double) constant.getFloatValue();
 
@@ -94,7 +94,7 @@ namespace soft {
         return label;
       }
       // double
-      else if (constant.getType().getBitwidth() == 64)
+      else if (constant.getType().isFloatingPoint(64))
       {
         double value = constant.getFloatValue();
 
@@ -184,22 +184,6 @@ namespace soft {
       // I don't know
       todo();
     }
-    void load(const Slot& slot)
-    {
-      Storage& stored = storage[slot.getId()];
-
-      // registers doesn't need to be loaded
-      if (stored.isRegister())
-        return;
-
-      const Memory& mem = stored.getMemory();
-      Register reg = allocate_register(mem.getType());
-      std::string mov = movts(mem.getType());
-      appendln("  {} {}, {}", mov, mem.toString(), reg.toString());
-
-      // note that it is a reference
-      stored.setValue(reg);
-    }
     void load_constant(const Constant& constant, const Register& dst)
     {
       appendln("  {} {}, {}", movts(dst.getType()), constantts(constant), dst.toString());
@@ -213,7 +197,9 @@ namespace soft {
       appendln("  {} {}, {}", movts(dst.getType()), mem.toString(), dst.toString());
     }
 
-    void int2int_cast(Value& src, Slot& dst)
+    // NOTE: `Constant` source values are not allowed and should
+    // be handled in the IR phase
+    void int2int_cast(Slot& src, Slot& dst)
     {
       Type& sty = src.getType(); // src type
       Type& dty = dst.getType(); // dst type
@@ -224,18 +210,11 @@ namespace soft {
       if (dty.cmpTo(sty))
         return;
 
-      // we don't need to do anything since they are both integers
-      // and the only difference will be the bitwidth (size).
-      if (src.isConstant())
-      {
-        src.getConstant().getType().setBitwidth(dty.getBitwidth());
-        return;
-      }
 
       // the source storage
       // WARN: we assume there's only a `Constant` and a `Slot`
       // possibilities for the `Value`
-      Storage& ss = storage[src.getSlot().getId()];
+      Storage& ss = storage[src.getId()];
 
       // in this case if the src is a variable in `Memory` we should load
       // it into a register of the same size(bitwidth) and change the bitwidth
@@ -282,6 +261,36 @@ namespace soft {
         storage[dst.getId()] = ds;
       }
     }
+    void int2float(Slot& src, Slot& dst)
+    {
+      Type& sty = src.getType(); // src type
+      Type& dty = dst.getType(); // dst type
+
+      if (!sty.isInteger() || !dty.isFloatingPoint())
+        return;
+
+      // since cvtsi2s[s|d]x requires a doubleword or a quad word source
+      if (sty.getBitwidth() < 32)
+      {
+        // make a temporary destination with an "Integer" type
+        // to pass it to `int2int_cast()` and re-assign it to the
+        // `src` to convert it to a floating point.
+        Slot tmp_dst = dst;
+        tmp_dst.setType(sty);
+
+        int2int_cast(src, tmp_dst);
+        src = tmp_dst;
+      }
+
+      // cvtsi2s[s|d][l|q]
+      std::string cvt = std::format("cvtsi2s{}{}", suffix(dty), suffix(sty));
+
+      Storage ds = allocate_register(dty); // destination storage
+      Storage ss = storage[src.getId()]; // src storage
+      appendln("  {} {}, {}", cvt, ss.toString(), ds.toString());
+
+      storage[dst.getId()] = ds;
+    }
 
     void generate_instruction(Instruction& instruction)
     {
@@ -302,46 +311,61 @@ namespace soft {
           const auto& store = std::get<1>(instruction);
           const auto& value = store.getSrc();
 
-          Storage src;
+          std::optional<Storage> ss; // src storage
           if (value.isSlot())
           {
             Storage stored = storage[value.getSlot().getId()];
 
             if (stored.isMemory())
             {
-              src = allocate_register(store.getDst().getType());
-              load_memory(stored.getMemory(), src.getRegister());
+              ss = allocate_register(store.getDst().getType());
+              load_memory(stored.getMemory(), ss->getRegister());
             }
             else // if (stored.isRegister())
             {
-              src = stored.getRegister();
+              ss = stored.getRegister();
             }
           }
           else if (value.isConstant() && value.getType().isFloatingPoint())
           {
-            src = allocate_register(store.getDst().getType());
-            load_constant(value.getConstant(), src.getRegister());
+            ss = allocate_register(store.getDst().getType());
+            load_constant(value.getConstant(), ss->getRegister());
           }
 
           std::string mov = movts(store.getDst().getType());
           std::string dst = storage[store.getDst().getId()].toString();
 
-          appendln("  {} {}, {}", mov, src.toString(), dst);
+          std::string src;
+          if (ss.has_value()) src = ss->toString();
+          else src = valuets(value);
+          appendln("  {} {}, {}", mov, src, dst);
 
-          if (src.isRegister())
-            deallocate(src.getRegister());
+          if (ss.has_value() && ss->isRegister())
+            deallocate(ss->getRegister());
 
           return;
         }
         case 2: // Convert
         {
           auto& convert = std::get<2>(instruction);
-          const Type& sty = convert.getSrc().getType();
-          const Type& dty = convert.getDst().getType();
+
+          if (!convert.getSrc().isSlot())
+          {
+            std::println("Error: the source should be a valid Slot when Casting");
+            exit(1);
+          }
+
+          Slot& src = convert.getSrc().getSlot();
+          Slot& dst = convert.getDst();
+
+          const Type& sty = src.getType();
+          const Type& dty = dst.getType();
 
           // int to int
           if (sty.isInteger() && dty.isInteger())
-            return int2int_cast(convert.getSrc(), convert.getDst());
+            return int2int_cast(src, dst);
+          else if (sty.isInteger() && dty.isFloatingPoint())
+            return int2float(src, dst);
           else
             unreachable();
         }
