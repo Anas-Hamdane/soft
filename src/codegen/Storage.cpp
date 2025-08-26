@@ -49,7 +49,7 @@ namespace soft {
 
       size_t index = static_cast<int>(this->knd);
       if (index >= 9)
-        return "%" + xmms[index];
+        return "%" + xmms[index - 9];
 
       switch (this->type.getByteSize())
       {
