@@ -40,6 +40,7 @@ namespace soft {
         result += std::format(" {}", this->value.getFloatValue());
       }
 
+      result += '\n';
       return result;
     }
 
@@ -58,7 +59,7 @@ namespace soft {
       std::string result = std::format("{}:\n", this->getName());
 
       for (const auto& elm : data)
-        result += std::format("{}\n", elm.toString());
+        result += std::format("  {}", elm.toString());
 
       return result;
     }
