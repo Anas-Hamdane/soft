@@ -27,6 +27,7 @@ RSS        := $(SRC)/main.cpp                   \
 								$(SRC)/ir/Instruction.cpp       \
 								$(SRC)/ir/Program.cpp           \
 								$(SRC)/codegen/Storage.cpp      \
+								$(SRC)/codegen/DataLabel.cpp    \
 								$(SRC)/codegen/codegen.cpp      \
 
 OBJS := $(RSS:$(SRC)/%.cpp=$(BUILD)/%.o)
