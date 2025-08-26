@@ -43,30 +43,17 @@ namespace soft {
     }};
 
     std::unordered_map<size_t, Storage> storage;
+
     std::vector<DataLabel> labels;
     std::unordered_map<double, DataLabel*> double_labels;
     std::unordered_map<float, DataLabel*> float_labels;
+
     std::string out;
     size_t offset;
 
     void deallocate(const Register& register_v)
     {
       pool[static_cast<int>(register_v.getKnd())].second = false;
-    }
-    void deallocate(const Slot& slot)
-    {
-      const auto& stored = storage[slot.getId()];
-      if (stored.isRegister())
-      {
-        return deallocate(stored.getRegister());
-      }
-    }
-    void deallocate(const Value& value)
-    {
-      if (value.isSlot())
-      {
-        return deallocate(value.getSlot());
-      }
     }
     char suffix(const Type& type)
     {
@@ -340,7 +327,10 @@ namespace soft {
           std::string dst = storage[store.getDst().getId()].toString();
 
           appendln("  {} {}, {}", mov, src.toString(), dst);
-          deallocate(store.getSrc());
+
+          if (src.isRegister())
+            deallocate(src.getRegister());
+
           return;
         }
         case 2: // Convert
