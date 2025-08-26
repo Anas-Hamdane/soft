@@ -293,8 +293,8 @@ namespace soft {
     }
     void float2int(Slot& src, Slot& dst)
     {
-      Type& sty = src.getType();
-      Type& dty = dst.getType();
+      Type& sty = src.getType(); // src type
+      Type& dty = dst.getType(); // dst type
 
       if (!sty.isFloatingPoint() || !dty.isInteger())
         return;
@@ -312,6 +312,34 @@ namespace soft {
       // restore original size
       if (dty.getBitwidth() != original_bitwidth)
         dty.setBitwidth(32);
+
+      storage[dst.getId()] = ds;
+    }
+    void float2float(Slot& src, Slot& dst)
+    {
+      Type& sty = src.getType(); // src type
+      Type& dty = dst.getType(); // dst type
+
+      if (!sty.isFloatingPoint() || !dty.isFloatingPoint())
+        return;
+
+      Storage ss = storage[src.getId()]; // src storage
+      Storage ds; // dst storage
+
+      // reuse the same register
+      if (ss.isRegister())
+      {
+        ds = ss;
+        ds.getType().setBitwidth(dty.getBitwidth());
+      }
+      // allocate a new register
+      else
+      {
+        ds = allocate_register(dty);
+      }
+
+      std::string cvt = std::format("cvts{}2s{}", suffix(sty), suffix(dty));
+      appendln("  {} {}, {}", cvt, ss.toString(), ds.toString());
 
       storage[dst.getId()] = ds;
     }
@@ -388,12 +416,22 @@ namespace soft {
           // int to int
           if (sty.isInteger() && dty.isInteger())
             return int2int(src, dst);
+
+          // int to float
           else if (sty.isInteger() && dty.isFloatingPoint())
             return int2float(src, dst);
+
+          // float to int
           else if (sty.isFloatingPoint() && dty.isInteger())
             return float2int(src, dst);
+
+          // float to float
+          else if (sty.isFloatingPoint() && dty.isFloatingPoint())
+            return float2float(src, dst);
+
+          // idk
           else
-            todo();
+            unreachable();
         }
         case 3: // BinOp
         {
