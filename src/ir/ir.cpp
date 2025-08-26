@@ -80,16 +80,13 @@ namespace soft {
       if (c.getType().cmpKnd(type.getKnd()))
         return;
 
-      if (c.isIntegerValue()) goto float_dst;
+      if (c.isIntegerValue()) c.setValue((double) c.getIntegerValue());
       else if (c.isFloatValue()) c.setValue((int64_t) c.getFloatValue());
       else unreachable();
 
       // casted successfully
       c.getType().setKnd(type.getKnd());
       return;
-
-float_dst:
-      todo();
     }
     void cast(Value& value, const Type& type)
     {

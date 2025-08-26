@@ -1,6 +1,7 @@
 #include "common.h"
 #include "codegen/codegen.h"
 #include "codegen/Storage.h"
+#include "codegen/DataLabel.h"
 #include <cassert>
 
 #define append(fmt, ...) out += std::format(fmt "\n" __VA_OPT__(,) __VA_ARGS__) 
@@ -41,6 +42,8 @@ namespace soft {
     }};
 
     std::unordered_map<size_t, Storage> storage;
+    std::unordered_map<double, DataLabel> double_labels;
+    std::unordered_map<float, DataLabel> float_labels;
     std::string out;
     size_t offset;
 
@@ -86,6 +89,34 @@ namespace soft {
       unreachable();
     }
 
+    DataLabel floating_point_label(const Constant& constant)
+    {
+      // float
+      if (constant.getType().getBitwidth() == 32)
+      {
+        float value = (double) constant.getFloatValue();
+
+        if (float_labels.find(value) != float_labels.end())
+          return float_labels[value];
+
+        DataLabel label(std::format(".F32N{}", float_labels.size()), {Data(constant)});
+        float_labels[value] = label;
+        return label;
+      }
+      // double
+      else if (constant.getType().getBitwidth() == 64)
+      {
+        double value = constant.getFloatValue();
+
+        if (double_labels.find(value) != double_labels.end())
+          return double_labels[value];
+
+        DataLabel label(std::format(".F64N{}", double_labels.size()), {Data(constant)});
+        double_labels[value] = label;
+        return label;
+      }
+      unreachable();
+    }
     // to string functions
     std::string movts(const Type& type)
     {
@@ -100,8 +131,12 @@ namespace soft {
     {
       if (constant.isIntegerValue())
         return std::format("${}", constant.getIntegerValue());
+
       else if (constant.isFloatValue())
-        todo();
+      {
+        DataLabel label = floating_point_label(constant);
+        return std::format("{}(%rip)", label.getName());
+      }
 
       unreachable();
     }
@@ -158,17 +193,12 @@ namespace soft {
       // I don't know
       todo();
     }
-    void load(Value& value)
+    void load(const Slot& slot)
     {
-      // constant doesn't need to be loaded
-      if (!value.isSlot())
-        return;
-
-      Slot& slot = value.getSlot();
       Storage& stored = storage[slot.getId()];
 
       // registers doesn't need to be loaded
-      if (!stored.isMemory())
+      if (stored.isRegister())
         return;
 
       const Memory& mem = stored.getMemory();
@@ -178,6 +208,18 @@ namespace soft {
 
       // note that it is a reference
       stored.setValue(reg);
+    }
+    void load_constant(const Constant& constant, const Register& dst)
+    {
+      append("  {} {}, {}", movts(dst.getType()), constantts(constant), dst.toString());
+    }
+    void load_register(const Register& reg, const Register& dst)
+    {
+      append("  {} {}, {}", movts(dst.getType()), reg.toString(), dst.toString());
+    }
+    void load_memory(const Memory& mem, const Register& dst)
+    {
+      append("  {} {}, {}", movts(dst.getType()), mem.toString(), dst.toString());
     }
 
     void int2int_cast(Value& src, Slot& dst)
@@ -249,6 +291,7 @@ namespace soft {
         storage[dst.getId()] = ds;
       }
     }
+
     void generate_instruction(Instruction& instruction)
     {
       switch (instruction.index())
@@ -269,7 +312,8 @@ namespace soft {
           auto value = store.getSrc();
 
           // loads ONLY if we need to
-          load(value);
+          if (value.isSlot())
+            load(value.getSlot());
 
           std::string mov = movts(store.getDst().getType());
           std::string src = valuets(store.getSrc());
@@ -301,6 +345,41 @@ namespace soft {
         }
       }
       unreachable();
+    }
+    void generate_terminator(const Return& terminator)
+    {
+      Register return_register;
+      Register::Knd return_knd;
+
+      if (terminator.getType().isInteger())
+        return_knd = Register::Knd::RAX;
+      else // if (terminator.getType().isFloatingPoint())
+        return_knd = Register::Knd::XMM0;
+
+      return_register.setType(terminator.getType());
+      return_register.setKnd(return_knd);
+
+      const Value& value = terminator.getValue();
+
+      // constants
+      if (value.isConstant())
+      {
+        load_constant(value.getConstant(), return_register);
+      }
+
+      // slots
+      else if (value.isSlot())
+      {
+        const Storage& stored = storage[value.getSlot().getId()];
+
+        if (stored.isMemory())
+          load_memory(stored.getMemory(), return_register);
+        else if (stored.isRegister() && stored.getRegister().getKnd() != return_knd)
+          load_register(stored.getRegister(), return_register);
+      }
+
+      append("  pop %rbp");
+      append("  ret");
     }
     void generate_params(const std::vector<Slot>& params)
     {
@@ -372,6 +451,7 @@ namespace soft {
       for (auto& instruction : body)
         generate_instruction(instruction);
 
+      generate_terminator(fn.getTerminator());
     }
     std::string generate(Program& program)
     {
