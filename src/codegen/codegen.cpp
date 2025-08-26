@@ -4,7 +4,8 @@
 #include "codegen/DataLabel.h"
 #include <cassert>
 
-#define append(fmt, ...) out += std::format(fmt "\n" __VA_OPT__(,) __VA_ARGS__) 
+#define appendln(fmt, ...) out += std::format(fmt "\n" __VA_OPT__(,) __VA_ARGS__) 
+#define append(fmt, ...) out += std::format(fmt __VA_OPT__(,) __VA_ARGS__) 
 
 namespace soft {
   namespace codegen {
@@ -42,8 +43,9 @@ namespace soft {
     }};
 
     std::unordered_map<size_t, Storage> storage;
-    std::unordered_map<double, DataLabel> double_labels;
-    std::unordered_map<float, DataLabel> float_labels;
+    std::vector<DataLabel> labels;
+    std::unordered_map<double, DataLabel*> double_labels;
+    std::unordered_map<float, DataLabel*> float_labels;
     std::string out;
     size_t offset;
 
@@ -97,10 +99,11 @@ namespace soft {
         float value = (double) constant.getFloatValue();
 
         if (float_labels.find(value) != float_labels.end())
-          return float_labels[value];
+          return *float_labels[value];
 
         DataLabel label(std::format(".F32N{}", float_labels.size()), {Data(constant)});
-        float_labels[value] = label;
+        labels.push_back(label);
+        float_labels[value] = &labels.back();
         return label;
       }
       // double
@@ -109,10 +112,11 @@ namespace soft {
         double value = constant.getFloatValue();
 
         if (double_labels.find(value) != double_labels.end())
-          return double_labels[value];
+          return *double_labels[value];
 
         DataLabel label(std::format(".F64N{}", double_labels.size()), {Data(constant)});
-        double_labels[value] = label;
+        labels.push_back(label);
+        double_labels[value] = &labels.back();
         return label;
       }
       unreachable();
@@ -204,22 +208,22 @@ namespace soft {
       const Memory& mem = stored.getMemory();
       Register reg = allocate_register(mem.getType());
       std::string mov = movts(mem.getType());
-      append("  {} {}, {}", mov, mem.toString(), reg.toString());
+      appendln("  {} {}, {}", mov, mem.toString(), reg.toString());
 
       // note that it is a reference
       stored.setValue(reg);
     }
     void load_constant(const Constant& constant, const Register& dst)
     {
-      append("  {} {}, {}", movts(dst.getType()), constantts(constant), dst.toString());
+      appendln("  {} {}, {}", movts(dst.getType()), constantts(constant), dst.toString());
     }
     void load_register(const Register& reg, const Register& dst)
     {
-      append("  {} {}, {}", movts(dst.getType()), reg.toString(), dst.toString());
+      appendln("  {} {}, {}", movts(dst.getType()), reg.toString(), dst.toString());
     }
     void load_memory(const Memory& mem, const Register& dst)
     {
-      append("  {} {}, {}", movts(dst.getType()), mem.toString(), dst.toString());
+      appendln("  {} {}, {}", movts(dst.getType()), mem.toString(), dst.toString());
     }
 
     void int2int_cast(Value& src, Slot& dst)
@@ -256,7 +260,7 @@ namespace soft {
         if (ss.isMemory())
         {
           ds = allocate_register(sty);
-          append("  {} {}, {}", movts(sty), ss.toString(), ds.toString());
+          appendln("  {} {}, {}", movts(sty), ss.toString(), ds.toString());
         }
         else // if (ss.isRegister())
         {
@@ -279,13 +283,13 @@ namespace soft {
         if (ss.isMemory())
         {
           ds = allocate_register(dty);
-          append("  {} {}, {}", mov, ss.toString(), ds.toString());
+          appendln("  {} {}, {}", mov, ss.toString(), ds.toString());
         }
         else // if (ss.isRegister())
         {
           ds = ss;
           ds.getType().setBitwidth(dty.getBitwidth());
-          append("  {} {}, {}", mov, ss.toString(), ds.toString());
+          appendln("  {} {}, {}", mov, ss.toString(), ds.toString());
         }
 
         storage[dst.getId()] = ds;
@@ -309,17 +313,33 @@ namespace soft {
         case 1: // Store
         {
           const auto& store = std::get<1>(instruction);
-          auto value = store.getSrc();
+          const auto& value = store.getSrc();
 
-          // loads ONLY if we need to
+          Storage src;
           if (value.isSlot())
-            load(value.getSlot());
+          {
+            Storage stored = storage[value.getSlot().getId()];
+
+            if (stored.isMemory())
+            {
+              src = allocate_register(store.getDst().getType());
+              load_memory(stored.getMemory(), src.getRegister());
+            }
+            else // if (stored.isRegister())
+            {
+              src = stored.getRegister();
+            }
+          }
+          else if (value.isConstant() && value.getType().isFloatingPoint())
+          {
+            src = allocate_register(store.getDst().getType());
+            load_constant(value.getConstant(), src.getRegister());
+          }
 
           std::string mov = movts(store.getDst().getType());
-          std::string src = valuets(store.getSrc());
           std::string dst = storage[store.getDst().getId()].toString();
 
-          append("  {} {}, {}", mov, src, dst);
+          appendln("  {} {}, {}", mov, src.toString(), dst);
           deallocate(store.getSrc());
           return;
         }
@@ -345,6 +365,14 @@ namespace soft {
         }
       }
       unreachable();
+    }
+    void generate_data(const std::vector<DataLabel>& data)
+    {
+      for (const auto& elm : data)
+      {
+        appendln();
+        append("{}", elm.toString());
+      }
     }
     void generate_terminator(const Return& terminator)
     {
@@ -378,8 +406,8 @@ namespace soft {
           load_register(stored.getRegister(), return_register);
       }
 
-      append("  pop %rbp");
-      append("  ret");
+      appendln("  popq %rbp");
+      appendln("  ret");
     }
     void generate_params(const std::vector<Slot>& params)
     {
@@ -409,15 +437,15 @@ namespace soft {
         if (index < end)
         {
           const std::string_view& src = is_integer ? integer_regs[index++] : float_regs[index++];
-          append("  {} {}, {}", mov, src, mem.toString());
+          appendln("  {} {}, {}", mov, src, mem.toString());
         }
         else
         {
           Storage temp = make_temp(param.getType());
           const std::string temp_form = temp.toString();
 
-          append("  {} {}(%rbp), {}", mov, stack_params_offset, temp_form);
-          append("  {} {}, {}", mov, temp_form, mem.toString());
+          appendln("  {} {}(%rbp), {}", mov, stack_params_offset, temp_form);
+          appendln("  {} {}, {}", mov, temp_form, mem.toString());
 
           stack_params_offset += param.getType().getByteSize();
         }
@@ -436,13 +464,13 @@ namespace soft {
         storage.reserve(total_registers - capacity);
 
       const std::string& name = fn.getName();
-      append(".globl {}", name);
-      append(".type {}, @function", name);
-      append("{}:", name);
+      appendln(".globl {}", name);
+      appendln(".type {}, @function", name);
+      appendln("{}:", name);
 
       // prologue
-      append("  pushq %rbp");
-      append("  movq %rsp, %rbp");
+      appendln("  pushq %rbp");
+      appendln("  movq %rsp, %rbp");
       offset = 0;
 
       generate_params(fn.getParams());
@@ -452,11 +480,14 @@ namespace soft {
         generate_instruction(instruction);
 
       generate_terminator(fn.getTerminator());
+
+      if (!labels.empty())
+        generate_data(labels);
     }
     std::string generate(Program& program)
     {
-      append("# Program: {}", program.getName());
-      append(".section .text\n");
+      appendln("# Program: {}", program.getName());
+      appendln(".section .text\n");
 
       auto& functions = program.getFunctions();
       for (auto& fn : functions)
