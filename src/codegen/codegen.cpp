@@ -51,6 +51,36 @@ namespace soft {
     std::string out;
     size_t offset;
 
+    bool isRegister(const Value& v)
+    {
+      if (!v.isSlot())
+        return false;
+
+      const Slot& slot = v.getSlot();
+      if (storage.find(slot.getId()) == storage.end())
+        return false;
+
+      return storage[slot.getId()].isRegister();
+    }
+    bool isMemory(const Value& v)
+    {
+      if (!v.isSlot())
+        return false;
+
+      const Slot& slot = v.getSlot();
+      if (storage.find(slot.getId()) == storage.end())
+        return false;
+
+      return storage[slot.getId()].isMemory();
+    }
+    Register& getRegister(const Value& v)
+    {
+      return storage[v.getSlot().getId()].getRegister();
+    }
+    Memory& getMemory(const Value& v)
+    {
+      return storage[v.getSlot().getId()].getMemory();
+    }
     void deallocate(const Register& register_v)
     {
       pool[static_cast<int>(register_v.getKnd())].second = false;
@@ -435,7 +465,101 @@ namespace soft {
         }
         case 3: // BinOp
         {
-          todo();
+          const auto& binop = std::get<3>(instruction);
+          // NOTE: Constant, Constant case is handled in the IR
+          // `constant_folding`
+          switch (binop.getOp())
+          {
+            case BinOp::Op::Add:
+            {
+              const Value& left = binop.getLeft();
+              const Value& right = binop.getRight();
+              const Slot& dst = binop.getDst();
+
+              std::string src;
+
+              // we need to load
+              if (left.isConstant() && isMemory(right))
+              {
+                const Memory& mem = getMemory(right);
+                Register dst_storage = allocate_register(mem.getType());
+                load_memory(mem, dst_storage);
+
+                storage[dst.getId()] = dst_storage;
+                src = constantts(left.getConstant());
+              }
+              else if (isMemory(left) && right.isConstant())
+              {
+                const Memory& mem = getMemory(left);
+                Register dst_storage = allocate_register(mem.getType());
+                load_memory(mem, dst_storage);
+
+                storage[dst.getId()] = dst_storage;
+                src = constantts(right.getConstant());
+              }
+              else if (isMemory(left) && isMemory(right))
+              {
+                const Memory& mem = getMemory(left);
+                Register dst_storage = allocate_register(mem.getType());
+                load_memory(mem, dst_storage);
+
+                storage[dst.getId()] = dst_storage;
+                src = getMemory(right).toString();
+              }
+
+              // we may re-use an operation side register
+              if (isRegister(left) && isRegister(right))
+              {
+                // the right register is the destination
+                storage[dst.getId()] = getRegister(right);
+
+                Register lr = getRegister(left);
+                // the left register is the source
+                src = lr.toString();
+
+                // special case: deallocate the left register
+                deallocate(lr);
+              }
+              else if (isRegister(left) && isMemory(right))
+              {
+                // the left register is the destination
+                storage[dst.getId()] = getRegister(left);
+                // the right (memory) is the src
+                src = getMemory(right).toString();
+              }
+              else if (isRegister(left) && right.isConstant())
+              {
+                // the left register is the destination
+                storage[dst.getId()] = getRegister(left);
+                // the right (constant) is the src
+                src = constantts(right.getConstant());
+              }
+              else if (isMemory(left) && isRegister(right))
+              {
+                // the right register is the destination
+                storage[dst.getId()] = getRegister(right);
+                // the left (memory) is the source
+                src = getMemory(left).toString();
+              }
+              else if (left.isConstant() && isRegister(right))
+              {
+                // the right register is the destination
+                storage[dst.getId()] = getRegister(right);
+                // the left (constant) is the source
+                src = constantts(left.getConstant());
+              }
+
+              std::string add = "add";
+              if (dst.getType().isFloatingPoint()) add += 's';
+              add += suffix(dst.getType());
+
+              Register dst_register = storage[dst.getId()].getRegister();
+              appendln("  {} {}, {}", add, src, dst_register.toString());
+              return;
+            }
+            default:
+              todo();
+          }
         }
         case 4: // UnOp
         {
@@ -485,7 +609,7 @@ namespace soft {
       }
 
       appendln("  popq %rbp");
-      appendln("  ret");
+      appendln("  retq");
     }
     void generate_params(const std::vector<Slot>& params)
     {
