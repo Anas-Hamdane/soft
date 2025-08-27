@@ -45,8 +45,8 @@ namespace soft {
     std::unordered_map<size_t, Storage> storage;
 
     std::vector<DataLabel> labels;
-    std::unordered_map<double, DataLabel*> double_labels;
-    std::unordered_map<float, DataLabel*> float_labels;
+    std::unordered_map<double, size_t> double_labels;
+    std::unordered_map<float, size_t> float_labels;
 
     std::string out;
     size_t offset;
@@ -115,12 +115,12 @@ namespace soft {
       {
         float value = (double) constant.getFloatValue();
 
-        if (float_labels.find(value) != float_labels.end())
-          return *float_labels[value];
+        if (auto it = float_labels.find(value); it != float_labels.end())
+          return labels[it->second];
 
         DataLabel label(std::format(".F32N{}", float_labels.size()), {Data(constant)});
         labels.push_back(label);
-        float_labels[value] = &labels.back();
+        float_labels[value] = labels.size() - 1;
         return label;
       }
       // double
@@ -128,12 +128,12 @@ namespace soft {
       {
         double value = constant.getFloatValue();
 
-        if (double_labels.find(value) != double_labels.end())
-          return *double_labels[value];
+        if (auto it = double_labels.find(value); it != double_labels.end())
+          return labels[it->second];
 
         DataLabel label(std::format(".F64N{}", double_labels.size()), {Data(constant)});
         labels.push_back(label);
-        double_labels[value] = &labels.back();
+        double_labels[value] = labels.size() - 1;
         return label;
       }
       unreachable();
@@ -307,6 +307,7 @@ namespace soft {
         // `src` to convert it to a floating point.
         Slot tmp_dst = dst;
         tmp_dst.setType(sty);
+        tmp_dst.getType().setBitwidth(32); // override the size
 
         int2int(src, tmp_dst);
         src = tmp_dst;
