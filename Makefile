@@ -6,7 +6,7 @@ BUILD      := ./build
 DATA       := ./build/data
 IR         := ./build/ir
 CODEGEN    := ./build/codegen
-PCH        := $(PCH_HEADER).gch
+PCH        := $(PCH_HEADER:$(INCLUDE)/%.h=$(BUILD)/%.gch)
 
 CXX        := clang++
 CXXFLAGS   := -std=c++23 -Wall -Wextra -I$(INCLUDE) -g
@@ -36,13 +36,13 @@ OBJS := $(RSS:$(SRC)/%.cpp=$(BUILD)/%.o)
 
 all: $(TARGET)
 
-$(TARGET): $(OBJS) $(PCH) | $(BUILD) $(DATA) $(IR) $(CODEGEN)
+$(TARGET): $(OBJS) $(PCH)
 	$(CXX) $(OBJS) -o $(TARGET)
 
 $(BUILD)/%.o: $(SRC)/%.cpp $(PCH) | $(BUILD) $(DATA) $(IR) $(CODEGEN)
 	$(CXX) -c $< -o $@ -include-pch $(PCH) $(CXXFLAGS)
 
-$(PCH): $(PCH_HEADER)
+$(PCH): $(PCH_HEADER) | $(BUILD)
 	$(CXX) -x c++-header $< -o $@ $(CXXFLAGS)
 
 $(BUILD):
@@ -59,3 +59,4 @@ $(CODEGEN):
 
 clean:
 	rm -rf $(BUILD)
+	rm -rf $(PCH)
