@@ -77,7 +77,7 @@ namespace soft {
   namespace lexer {
     char peek(off_t offset = 0);
     char advance(off_t offset = 1);
-    bool match(char c);
+    bool match(char c, off_t offset = 0);
 
     size_t number_base(const std::string& str);
     std::vector<Token> lex(std::string src);

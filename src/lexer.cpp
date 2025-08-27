@@ -126,12 +126,9 @@ namespace soft {
       index += offset;
       return c;
     }
-    bool match(char c)
+    bool match(char c, off_t offset)
     {
-      if (index >= src.length())
-        return false;
-
-      return (src[index] == c);
+      return peek(offset) == c;
     }
 
     size_t number_base(const std::string& str)
@@ -423,9 +420,9 @@ namespace soft {
       src = source;
       index = 0;
 
-      while (peek() != '\0')
+      while (!match('\0'))
       {
-        if (peek() == '\0')
+        if (match('\0'))
         {
           tkns.push_back({ Token::Knd::EndOfFile, ""});
           break;
@@ -433,33 +430,33 @@ namespace soft {
 
         // TODO: use the new line separeted check to track the current
         // line and the location of each token
-        if (space(peek()) || peek() == '\n')
+        if (space(peek()) || match('\n'))
         {
           advance(); continue;
         }
 
-        if (peek() == '/' && peek(1) == '/')
+        if (match('/') && match('/', 1))
         {
-          while (peek() != '\n')
+          while (match('\n'))
             advance();
 
           advance(); continue;
         }
 
-        if (peek() == '/' && peek(1) == '*')
+        if (match('/') && match('*'))
         {
-          while (peek() != '*' || peek(1) != '/')
+          while (!match('*') || !match('/'))
             advance();
 
           advance(2); continue;
         }
 
         // identifier/keyword/primitive datatype start
-        if (peek() == '_' || alpha(peek()))
+        if (match('_') || alpha(peek()))
         {
           std::string lexeme;
 
-          while (peek() == '_' || alnum(peek()))
+          while (match('_') || alnum(peek()))
             lexeme += advance();
 
           Token tkn = { Token::Knd::Invalid, "" };
@@ -505,7 +502,12 @@ namespace soft {
         {
           std::string lexeme;
 
-          while (alnum(peek()) || peek() == '.' || peek() == '+' || peek() == '-')
+          auto valid = []() {
+            return alnum(peek()) || match('.') ||
+              (index > 0 && match('e', -1) && (match('+') || match('-')));
+          };
+
+          while (valid())
             lexeme += advance();
 
           Token tkn;
