@@ -558,6 +558,109 @@ namespace soft {
               appendln("  {} {}, {}", add, src, dst_register.toString());
               return;
             }
+            case BinOp::Op::Sub:
+            {
+              const Value& left = binop.getLeft();
+              const Value& right = binop.getRight();
+              const Slot& dst = binop.getDst();
+
+              std::string src;
+
+              // we need to load
+              if (left.isConstant() && isMemory(right))
+              {
+                const Constant constant = left.getConstant();
+                Register dst_storage = allocate_register(constant.getType());
+                load_constant(constant, dst_storage);
+
+                storage[dst.getId()] = dst_storage;
+                src = getMemory(right).toString();
+              }
+              else if (isMemory(left) && right.isConstant())
+              {
+                const Memory& mem = getMemory(left);
+                Register dst_storage = allocate_register(mem.getType());
+                load_memory(mem, dst_storage);
+
+                storage[dst.getId()] = dst_storage;
+                src = constantts(right.getConstant());
+              }
+              else if (isMemory(left) && isMemory(right))
+              {
+                const Memory& mem = getMemory(left);
+                Register dst_storage = allocate_register(mem.getType());
+                load_memory(mem, dst_storage);
+
+                storage[dst.getId()] = dst_storage;
+                src = getMemory(right).toString();
+              }
+
+              // we need to load in these cases because the sub operation
+              // performs dst -= src, do we need to preserve the sides
+              else if (isMemory(left) && isRegister(right))
+              {
+                const Memory& mem = getMemory(left);
+                Register dst_storage = allocate_register(mem.getType());
+                load_memory(mem, dst_storage);
+
+                storage[dst.getId()] = dst_storage;
+
+                Register rr = getRegister(right);
+                src = rr.toString();
+                
+                // special case: we don't need the right register anymore
+                deallocate(rr);
+              }
+              else if (left.isConstant() && isRegister(right))
+              {
+                const Constant& constant = left.getConstant();
+                Register dst_storage = allocate_register(constant.getType());
+                load_constant(constant, dst_storage);
+
+                storage[dst.getId()] = dst_storage;
+                Register rr = getRegister(right);
+                src = rr.toString();
+
+                // special case: we don't need the right register anymore
+                deallocate(rr);
+              }
+
+              // we may re-use an operation side register
+              // because the left side is a register
+              if (isRegister(left) && isRegister(right))
+              {
+                storage[dst.getId()] = getRegister(left);
+
+                Register rr = getRegister(right);
+                src = rr.toString();
+
+                // special case: deallocate the right register
+                deallocate(rr);
+              }
+              else if (isRegister(left) && isMemory(right))
+              {
+                // the left register is the destination
+                storage[dst.getId()] = getRegister(left);
+                // the right (memory) is the src
+                src = getMemory(right).toString();
+              }
+              else if (isRegister(left) && right.isConstant())
+              {
+                // the left register is the destination
+                storage[dst.getId()] = getRegister(left);
+                // the right (constant) is the src
+                src = constantts(right.getConstant());
+              }
+
+              // same form as add
+              std::string sub = "sub";
+              if (dst.getType().isFloatingPoint()) sub += 's';
+              sub += suffix(dst.getType());
+
+              Register dst_register = storage[dst.getId()].getRegister();
+              appendln("  {} {}, {}", sub, src, dst_register.toString());
+              return;
+            }
             default:
               todo();
           }
